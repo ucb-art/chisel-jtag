@@ -4,7 +4,7 @@ version := "0"
 
 scalaVersion := "2.11.7"
 
-scalacOptions := Seq("-deprecation")
+scalacOptions := Seq("-deprecation", "-feature")
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),

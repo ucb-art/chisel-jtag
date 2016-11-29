@@ -16,6 +16,8 @@ class NegativeEdgeLatch(clock: Clock, width: Int) extends Module(override_clock=
   io.output := reg
 }
 
+/** Generates a register that updates on the falling edge of the input clock signal.
+  */
 object NegativeEdgeLatch {
   def apply(clock: Clock, signal: Data, width: Int): UInt = {
     val latch_module = Module(new NegativeEdgeLatch((!clock.asUInt).asClock, width))
@@ -34,6 +36,8 @@ class JtagIO extends Bundle {
   val TDO = Output(Bool())
 }
 
+/** JTAG TAP internal block, that has a overridden clock so registers can be clocked on TCK rising.
+  */
 class JtagTapInternal(mod_clock: Clock) extends Module(override_clock=Some(mod_clock)) {
   val io = IO(new JtagIO)
 
