@@ -12,23 +12,21 @@ class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) {
   step(1)
 
   poke(c.io.TDI, 1)
-  poke(c.io.TCK, 0)
+  poke(c.io.TCK, 0)  // TDI should latch here
   step(1)
-  poke(c.io.TDI, 0)
+  poke(c.io.TDI, 0)  // ensure that TDI isn't latched after TCK goes high
   poke(c.io.TCK, 1)
   step(1)
   expect(c.io.TDO, 1)
 
-  poke(c.io.TDI, 0)
-  poke(c.io.TCK, 0)
+  poke(c.io.TCK, 0)  // previous TDI transition should latch here
   step(1)
-  expect(c.io.TDO, 1)
+  expect(c.io.TDO, 1)  // ensure TDO doesn't change on falling edge
   poke(c.io.TDI, 1)
   poke(c.io.TCK, 1)
   step(1)
-  expect(c.io.TDO, 0)
+  expect(c.io.TDO, 0)  // previous TDI transition seen on output here
 
-  poke(c.io.TDI, 1)
   poke(c.io.TCK, 0)
   step(1)
   expect(c.io.TDO, 0)

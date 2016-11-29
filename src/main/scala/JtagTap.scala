@@ -17,8 +17,8 @@ class NegativeEdgeLatch(clock: Clock, width: Int) extends Module(override_clock=
 }
 
 object NegativeEdgeLatch {
-  def apply(clock: Bool, signal: Data, width: Int): UInt = {
-    val latch_module = Module(new NegativeEdgeLatch((!clock).asClock, width))
+  def apply(clock: Clock, signal: Data, width: Int): UInt = {
+    val latch_module = Module(new NegativeEdgeLatch((!clock.asUInt).asClock, width))
     latch_module.io.input := signal
     latch_module.io.output
   }
@@ -34,12 +34,12 @@ class JtagIO extends Bundle {
   val TDO = Output(Bool())
 }
 
-class JtagTapInternal(clock: Clock) extends Module(override_clock=Some(clock)) {
+class JtagTapInternal(mod_clock: Clock) extends Module(override_clock=Some(mod_clock)) {
   val io = IO(new JtagIO)
 
   // Signals captured on negative edge
-  val tms = NegativeEdgeLatch(io.TCK, io.TMS, 1)
-  val tdi = NegativeEdgeLatch(io.TCK, io.TDI, 1)
+  val tms = NegativeEdgeLatch(clock, io.TMS, 1)
+  val tdi = NegativeEdgeLatch(clock, io.TDI, 1)
   val tdo = Reg(Bool())
   tdo := tdi
   io.TDO := tdo
@@ -47,7 +47,7 @@ class JtagTapInternal(clock: Clock) extends Module(override_clock=Some(clock)) {
 
 class JtagTap() extends Module {
   val io = IO(new JtagIO)
-  
+
   val tap = Module(new JtagTapInternal(io.TCK.asClock))
   io <> tap.io
 }
