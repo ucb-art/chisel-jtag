@@ -4,36 +4,61 @@ package jtag.test
 
 import Chisel.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
 
+import chisel3._
 import jtag._
 
+trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] {
+  def jtagLow(io: JtagIO) {
+    poke(io.TCK, 0)
+    step(1)
+  }
+  def jtagHigh(io: JtagIO) {
+    poke(io.TCK, 1)
+    step(1)
+  }
+
+  /**
+    *
+    */
+  def tmsReset(io: JtagIO) {
+    poke(io.TMS, 1)
+    jtagHigh(io)  // set to known state
+    for (_ <- 0 until 5) {
+      jtagLow(io)
+      jtagHigh(io)
+    }
+  }
+}
 
 class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) {
-  poke(c.io.TCK, 1)
+  val jtag = c.io.jtag
+
+  poke(jtag.TCK, 1)
   step(1)
 
-  poke(c.io.TDI, 1)
-  poke(c.io.TCK, 0)  // TDI should latch here
+  poke(jtag.TDI, 1)
+  poke(jtag.TCK, 0)  // TDI should latch here
   step(1)
-  poke(c.io.TDI, 0)  // ensure that TDI isn't latched after TCK goes high
-  poke(c.io.TCK, 1)
+  poke(jtag.TDI, 0)  // ensure that TDI isn't latched after TCK goes high
+  poke(jtag.TCK, 1)
   step(1)
-  expect(c.io.TDO, 1)
+  expect(jtag.TDO, 1)
 
-  poke(c.io.TCK, 0)  // previous TDI transition should latch here
+  poke(jtag.TCK, 0)  // previous TDI transition should latch here
   step(1)
-  expect(c.io.TDO, 1)  // ensure TDO doesn't change on falling edge
-  poke(c.io.TDI, 1)
-  poke(c.io.TCK, 1)
+  expect(jtag.TDO, 1)  // ensure TDO doesn't change on falling edge
+  poke(jtag.TDI, 1)
+  poke(jtag.TCK, 1)
   step(1)
-  expect(c.io.TDO, 0)  // previous TDI transition seen on output here
+  expect(jtag.TDO, 0)  // previous TDI transition seen on output here
 
-  poke(c.io.TCK, 0)
+  poke(jtag.TCK, 0)
   step(1)
-  expect(c.io.TDO, 0)
-  poke(c.io.TDI, 0)
-  poke(c.io.TCK, 1)
+  expect(jtag.TDO, 0)
+  poke(jtag.TDI, 0)
+  poke(jtag.TCK, 1)
   step(1)
-  expect(c.io.TDO, 1)
+  expect(jtag.TDO, 1)
 }
 
 class JtagTapSpec extends ChiselFlatSpec {
