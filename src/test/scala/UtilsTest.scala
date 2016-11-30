@@ -70,9 +70,20 @@ class NegativeEdgeLatchUIntTest(val c: NegativeEdgeLatchTestModule[UInt]) extend
   step(1)
   expect(c.io.out, 2)
 }
+/** Test helper object for simple conversions from string to literal.
+  */
+object BinaryParse {
+  // from https://stackoverflow.com/questions/7197119/how-to-write-binary-literals-in-scala
+  implicit class IntToBase(val digits: String) extends AnyVal {
+    def base(b:Int) = Integer.parseInt(digits, b)
+    def b = base(2)
+    def o = base(8)
+    def x = base(16)
+  }
+}
 
 class NegativeEdgeLatchTestModule[T <: Data](dataType: T) extends Module {
-  class ModIO() extends Bundle {
+  class ModIO extends Bundle {
     val in = Input(dataType)
     val enable = Input(Bool())
     val out = Output(dataType)
@@ -89,7 +100,7 @@ class NegativeEdgeLatchTestModule[T <: Data](dataType: T) extends Module {
   io <> mod.io
 }
 
-class UtilsSpec extends ChiselFlatSpec {
+class NegativeEdgeLatchSpec extends ChiselFlatSpec {
   "NegativeEdgeLatch with a Bool" should "work" in {
     Driver(() => new NegativeEdgeLatchTestModule(Bool()), backendType="verilator") {
       c => new NegativeEdgeLatchBoolTest(c)
@@ -98,6 +109,65 @@ class UtilsSpec extends ChiselFlatSpec {
   "NegativeEdgeLatch with a UInt" should "work" in {
     Driver(() => new NegativeEdgeLatchTestModule(UInt(2.W)), backendType="verilator") {
       c => new NegativeEdgeLatchUIntTest(c)
+    } should be (true)
+  }
+}
+
+class ParallelShiftRegisterTest(val c: ParallelShiftRegisterModule) extends PeekPokeTester(c) {
+  import BinaryParse._
+
+  poke(c.io.shift, 0)
+  poke(c.io.load, 1)
+  poke(c.io.loadData, "01001110".b)
+  step(1)
+  expect(c.io.out, "01001110".b)
+
+  poke(c.io.load, 0)
+  poke(c.io.shift, 1)
+  poke(c.io.in, 1)
+  step(1)
+  expect(c.io.out, "10100111".b)
+
+  poke(c.io.in, 1)
+  step(1)
+  expect(c.io.out, "11010011".b)
+
+  poke(c.io.in, 0)
+  step(1)
+  expect(c.io.out, "01101001".b)
+
+  poke(c.io.in, 1)
+  step(1)
+  expect(c.io.out, "10110100".b)
+
+  poke(c.io.shift, 0)
+  poke(c.io.load, 1)
+  poke(c.io.loadData, "11111111".b)
+  step(1)
+  expect(c.io.out, "11111111".b)
+
+  poke(c.io.loadData, "00000000".b)
+  step(1)
+  expect(c.io.out, "00000000".b)
+}
+
+class ParallelShiftRegisterModule(length: Int) extends Module {
+  class ModIO extends Bundle {
+    val in = Input(Bool())
+    val load = Input(Bool())
+    val loadData = Input(UInt(length.W))
+    val shift = Input(Bool())
+    val out = Output(UInt(length.W))
+  }
+  val io = IO(new ModIO)
+
+  io.out := ParallelShiftRegister(length, io.shift, io.in, io.load, io.loadData)
+}
+
+class ParallelShiftRegisterSpec extends ChiselFlatSpec {
+  "8-bit ParallelShiftRegisterTest" should "work" in {
+    Driver(() => new ParallelShiftRegisterModule(8)) {
+      c => new ParallelShiftRegisterTest(c)
     } should be (true)
   }
 }

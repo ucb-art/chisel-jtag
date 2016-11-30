@@ -47,13 +47,14 @@ object ParallelShiftRegister {
     */
   def apply(n: Int, shift: Bool, input: Bool, load: Bool, loadData: UInt): UInt = {
     val regs = (0 until n) map (x => Reg(Bool()))
-    when (shift) {
-      regs(0) := input
-      (1 until n) map (x => regs(x) := regs(x-1))
-    } .elsewhen (load) {
+    when (load) {
       (0 until n) map (x => regs(x) := loadData(x))
+    } .elsewhen (shift) {
+      regs(n-1) := input
+      (0 until n-1) map (x => regs(x) := regs(x+1))
     }
-    Cat(regs)
+    assert(!(shift && load))
+    Cat(regs.reverse)
   }
 }
 
