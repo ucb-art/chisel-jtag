@@ -63,8 +63,8 @@ class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) {
 
 class JtagTapSpec extends ChiselFlatSpec {
   "JTAG TAP" should "work" in {
-    //Driver(() => new JtagTap()) {  // multiclock doesn't work here yet
-    Driver(() => new JtagTap(), backendType="verilator") {
+    //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
+    Driver(() => new JtagTap(2), backendType="verilator") {
       c => new JtagTapTester(c)
     } should be (true)
   }

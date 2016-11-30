@@ -61,46 +61,23 @@ object JtagState {
     def chiselType() = UInt(width.W)
   }
 
-  // States as described in 6.1.1.2
-  case object TestLogicReset extends State(0)  // no effect on system logic, entered when TMS high for 5 TCK rising edges
-  case object RunTestIdle extends State(1)  // runs active instruction (which can be idle)
-  case object SelectDRScan extends State(2)
-  case object CaptureDR extends State(3)  // parallel-load DR shifter when exiting this state (if required)
-  case object ShiftDR extends State(4)  // shifts DR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
-  case object Exit1DR extends State(5)
-  case object PauseDR extends State(6)  // pause DR shifting
-  case object Exit2DR extends State(7)
-  case object UpdateDR extends State(8)  // parallel-load output from DR shifter when exiting this state
-  case object SelectIRScan extends State(9)
-  case object CaptureIR extends State(10)  // parallel-load IR shifter with fixed logic values and design-specific when exiting this state (if required)
-  case object ShiftIR extends State(11)  // shifts IR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
-  case object Exit1IR extends State(12)
-  case object PauseIR extends State(13)  // pause IR shifting
-  case object Exit2IR extends State(14)
-  case object UpdateIR extends State(15)  // latch IR shifter into IR, instruction becomes active
-}
-
-/** JTAG signals, viewed from the device side.
-  */
-class JtagIO extends Bundle {
-  // TRST (4.6) is optional and not currently implemented.
-  val TCK = Input(Bool())
-  val TMS = Input(Bool())
-  val TDI = Input(Bool())
-  val TDO = Output(Bool())
-}
-
-/** JTAG block internal status information, for testing purposes.
-  */
-class JtagStatus extends Bundle {
-  val state = Output(JtagState.State.chiselType())
-}
-
-/** Aggregate JTAG block IO
-  */
-class JtagBlockIO extends Bundle {
-  val jtag = new JtagIO
-  val status = new JtagStatus
+  // States as described in 6.1.1.2, numeric assignments from example in Table 6-3
+  case object TestLogicReset extends State(15)  // no effect on system logic, entered when TMS high for 5 TCK rising edges
+  case object RunTestIdle extends State(12)  // runs active instruction (which can be idle)
+  case object SelectDRScan extends State(7)
+  case object CaptureDR extends State(6)  // parallel-load DR shifter when exiting this state (if required)
+  case object ShiftDR extends State(2)  // shifts DR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
+  case object Exit1DR extends State(1)
+  case object PauseDR extends State(3)  // pause DR shifting
+  case object Exit2DR extends State(0)
+  case object UpdateDR extends State(5)  // parallel-load output from DR shifter on TCK falling edge while in this state
+  case object SelectIRScan extends State(4)
+  case object CaptureIR extends State(14)  // parallel-load IR shifter with fixed logic values and design-specific when exiting this state (if required)
+  case object ShiftIR extends State(10)  // shifts IR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
+  case object Exit1IR extends State(9)
+  case object PauseIR extends State(11)  // pause IR shifting
+  case object Exit2IR extends State(8)
+  case object UpdateIR extends State(13)  // latch IR shifter into IR on TCK falling edge while in this state
 }
 
 /** The JTAG state machine, implements spec 6.1.1.1a (Figure 6.1)
@@ -175,13 +152,43 @@ class JtagStateMachine extends Module {
   }
 }
 
+/** JTAG signals, viewed from the device side.
+  */
+class JtagIO extends Bundle {
+  // TRST (4.6) is optional and not currently implemented.
+  val TCK = Input(Bool())
+  val TMS = Input(Bool())
+  val TDI = Input(Bool())
+  val TDO = Output(Bool())
+}
+
+/** JTAG block internal status information, for testing purposes.
+  */
+class JtagStatus(irLength: Int) extends Bundle {
+  val state = Output(JtagState.State.chiselType())  // state, transitions on TCK rising edge
+  val instruction = Output(UInt(irLength.W))  // current active instruction,
+}
+
+/** Aggregate JTAG block IO
+  */
+class JtagBlockIO(irLength: Int) extends Bundle {
+  val jtag = new JtagIO
+  val status = new JtagStatus(irLength)
+}
+
 /** JTAG TAP internal block, that has a overridden clock so registers can be clocked on TCK rising.
   *
   * Misc notes:
   * - Figure 6-3 and 6-4 provides examples with timing behavior
+  *
+  * TODO:
+  * - Implement test mode persistence (TMP) controller, 6.2
   */
-class JtagTapInternal(mod_clock: Clock) extends Module(override_clock=Some(mod_clock)) {
-  val io = IO(new JtagBlockIO)
+class JtagTapInternal(mod_clock: Clock, irLength: Int)
+    extends Module(override_clock=Some(mod_clock)) {
+  require(irLength >= 2)
+
+  val io = IO(new JtagBlockIO(irLength))
 
   val tms = Reg(Bool(), next=io.jtag.TMS)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   val tdi = Reg(Bool(), next=io.jtag.TDI)  // 4.3.2a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
@@ -191,20 +198,24 @@ class JtagTapInternal(mod_clock: Clock) extends Module(override_clock=Some(mod_c
   tdo := tdi  // test
 
   // Notes
-  // IR should be initialized to IDCODE instruction (when avaikable) or BYPASS
+  // IR should be initialized to IDCODE instruction (when available) or BYPASS
 }
 
 /** JTAG TAP block, clocked from TCK.
+  *
+  * @param irLength length, in bits, of instruction register, must be at least 2
   *
   * Usage notes:
   * - 4.3.1b TMS must appear high when undriven
   * - 4.3.1c (rec) minimize load presented by TMS
   * - 4.4.1b TDI must appear high when undriven
   * - 4.5.1b TDO must be inactive except when shifting data (undriven? 6.1.2)
+  * - 6.1.3.1b TAP controller must not be (re-?)initialized by system reset (allows boundary-scan testing of reset pin)
+  *   - 6.1 TAP controller can be initialized by a on-chip power on reset generator, the same one that would initialize system logic
   */
-class JtagTap() extends Module {
-  val io = IO(new JtagBlockIO)
+class JtagTap(irLength: Int) extends Module {
+  val io = IO(new JtagBlockIO(irLength))
 
-  val tap = Module(new JtagTapInternal(io.jtag.TCK.asClock))
+  val tap = Module(new JtagTapInternal(io.jtag.TCK.asClock, irLength))
   io <> tap.io
 }
