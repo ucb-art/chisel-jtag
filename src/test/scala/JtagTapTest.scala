@@ -42,29 +42,29 @@ class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) {
   poke(jtag.TDI, 0)  // ensure that TDI isn't latched after TCK goes low
   poke(jtag.TCK, 0)
   step(1)
-  expect(jtag.TDO, 1)
+  expect(jtag.TDO.data, 1)
 
   poke(jtag.TCK, 1)  // previous TDI transition should latch here
   step(1)
-  expect(jtag.TDO, 1)  // ensure TDO doesn't change on rising edge
+  expect(jtag.TDO.data, 1)  // ensure TDO doesn't change on rising edge
   poke(jtag.TDI, 1)
   poke(jtag.TCK, 0)
   step(1)
-  expect(jtag.TDO, 0)  // previous TDI transition seen on output here
+  expect(jtag.TDO.data, 0)  // previous TDI transition seen on output here
 
   poke(jtag.TCK, 1)
   step(1)
-  expect(jtag.TDO, 0)
+  expect(jtag.TDO.data, 0)
   poke(jtag.TDI, 0)
   poke(jtag.TCK, 0)
   step(1)
-  expect(jtag.TDO, 1)
+  expect(jtag.TDO.data, 1)
 }
 
 class JtagTapSpec extends ChiselFlatSpec {
   "JTAG TAP" should "work" in {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => new JtagTap(2), backendType="verilator") {
+    Driver(() => new JtagTap(2, Map(0.U -> 0)), backendType="verilator") {
       c => new JtagTapTester(c)
     } should be (true)
   }
