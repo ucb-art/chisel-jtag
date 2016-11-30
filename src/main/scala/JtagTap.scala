@@ -61,22 +61,23 @@ object JtagState {
     def chiselType() = UInt(width.W)
   }
 
-  case object TestLogicReset extends State(0)
-  case object RunTestIdle extends State(1)
+  // States as described in 6.1.1.2
+  case object TestLogicReset extends State(0)  // no effect on system logic, entered when TMS high for 5 TCK rising edges
+  case object RunTestIdle extends State(1)  // runs active instruction (which can be idle)
   case object SelectDRScan extends State(2)
-  case object CaptureDR extends State(3)
-  case object ShiftDR extends State(4)
+  case object CaptureDR extends State(3)  // parallel-load DR shifter when exiting this state (if required)
+  case object ShiftDR extends State(4)  // shifts DR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
   case object Exit1DR extends State(5)
-  case object PauseDR extends State(6)
+  case object PauseDR extends State(6)  // pause DR shifting
   case object Exit2DR extends State(7)
-  case object UpdateDR extends State(8)
+  case object UpdateDR extends State(8)  // parallel-load output from DR shifter when exiting this state
   case object SelectIRScan extends State(9)
-  case object CaptureIR extends State(10)
-  case object ShiftIR extends State(11)
+  case object CaptureIR extends State(10)  // parallel-load IR shifter with fixed logic values and design-specific when exiting this state (if required)
+  case object ShiftIR extends State(11)  // shifts IR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
   case object Exit1IR extends State(12)
-  case object PauseIR extends State(13)
+  case object PauseIR extends State(13)  // pause IR shifting
   case object Exit2IR extends State(14)
-  case object UpdateIR extends State(15)
+  case object UpdateIR extends State(15)  // latch IR shifter into IR, instruction becomes active
 }
 
 /** JTAG signals, viewed from the device side.
@@ -102,6 +103,12 @@ class JtagBlockIO extends Bundle {
   val status = new JtagStatus
 }
 
+/** The JTAG state machine, implements spec 6.1.1.1a (Figure 6.1)
+  *
+  * Usage notes:
+  * - 6.1.1.1b state transitions occur on TCK rising edge
+  * - 6.1.1.1c actions can occur on the following TCK falling or rising edge
+  */
 class JtagStateMachine extends Module {
   class StateMachineIO extends Bundle {
     val TMS = Input(Bool())
@@ -169,16 +176,22 @@ class JtagStateMachine extends Module {
 }
 
 /** JTAG TAP internal block, that has a overridden clock so registers can be clocked on TCK rising.
+  *
+  * Misc notes:
+  * - Figure 6-3 and 6-4 provides examples with timing behavior
   */
 class JtagTapInternal(mod_clock: Clock) extends Module(override_clock=Some(mod_clock)) {
   val io = IO(new JtagBlockIO)
 
-  val tms = Reg(Bool(), next=io.jtag.TMS)  // 4.3.1a captured on TCK rising edge
-  val tdi = Reg(Bool(), next=io.jtag.TDI)  // 4.3.2a captured on TCK rising edge
+  val tms = Reg(Bool(), next=io.jtag.TMS)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
+  val tdi = Reg(Bool(), next=io.jtag.TDI)  // 4.3.2a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
-  io.jtag.TDO := NegativeEdgeLatch(clock, tdo, 1)  // 4.5.1a TDO changes on falling edge of TCK or TRST
+  io.jtag.TDO := NegativeEdgeLatch(clock, tdo, 1)  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
 
   tdo := tdi  // test
+
+  // Notes
+  // IR should be initialized to IDCODE instruction (when avaikable) or BYPASS
 }
 
 /** JTAG TAP block, clocked from TCK.
