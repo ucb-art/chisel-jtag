@@ -33,30 +33,30 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] {
 class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) {
   val jtag = c.io.jtag
 
-  poke(jtag.TCK, 1)
+  poke(jtag.TCK, 0)
   step(1)
 
   poke(jtag.TDI, 1)
-  poke(jtag.TCK, 0)  // TDI should latch here
+  poke(jtag.TCK, 1)  // TDI should latch here
   step(1)
-  poke(jtag.TDI, 0)  // ensure that TDI isn't latched after TCK goes high
-  poke(jtag.TCK, 1)
+  poke(jtag.TDI, 0)  // ensure that TDI isn't latched after TCK goes low
+  poke(jtag.TCK, 0)
   step(1)
   expect(jtag.TDO, 1)
 
-  poke(jtag.TCK, 0)  // previous TDI transition should latch here
+  poke(jtag.TCK, 1)  // previous TDI transition should latch here
   step(1)
-  expect(jtag.TDO, 1)  // ensure TDO doesn't change on falling edge
+  expect(jtag.TDO, 1)  // ensure TDO doesn't change on rising edge
   poke(jtag.TDI, 1)
-  poke(jtag.TCK, 1)
+  poke(jtag.TCK, 0)
   step(1)
   expect(jtag.TDO, 0)  // previous TDI transition seen on output here
 
-  poke(jtag.TCK, 0)
+  poke(jtag.TCK, 1)
   step(1)
   expect(jtag.TDO, 0)
   poke(jtag.TDI, 0)
-  poke(jtag.TCK, 1)
+  poke(jtag.TCK, 0)
   step(1)
   expect(jtag.TDO, 1)
 }

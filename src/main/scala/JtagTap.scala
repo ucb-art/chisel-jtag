@@ -82,7 +82,7 @@ object JtagState {
 /** JTAG signals, viewed from the device side.
   */
 class JtagIO extends Bundle {
-  // TRST is optional and not currently implemented.
+  // TRST (4.6) is optional and not currently implemented.
   val TCK = Input(Bool())
   val TMS = Input(Bool())
   val TDI = Input(Bool())
@@ -110,7 +110,7 @@ class JtagStateMachine extends Module {
   }
   val io = IO(new StateMachineIO)
 
-  val currState = Reg(JtagState.State.chiselType())
+  val currState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U)
   val nextState = Wire(JtagState.State.chiselType())
   currState := nextState
   io.currState := currState
@@ -173,14 +173,22 @@ class JtagStateMachine extends Module {
 class JtagTapInternal(mod_clock: Clock) extends Module(override_clock=Some(mod_clock)) {
   val io = IO(new JtagBlockIO)
 
-  // Signals captured on negative edge
-  val tms = NegativeEdgeLatch(clock, io.jtag.TMS, 1)
-  val tdi = NegativeEdgeLatch(clock, io.jtag.TDI, 1)
-  val tdo = Reg(Bool())
-  tdo := tdi
-  io.jtag.TDO := tdo
+  val tms = Reg(Bool(), next=io.jtag.TMS)  // 4.3.1a captured on TCK rising edge
+  val tdi = Reg(Bool(), next=io.jtag.TDI)  // 4.3.2a captured on TCK rising edge
+  val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
+  io.jtag.TDO := NegativeEdgeLatch(clock, tdo, 1)  // 4.5.1a TDO changes on falling edge of TCK or TRST
+
+  tdo := tdi  // test
 }
 
+/** JTAG TAP block, clocked from TCK.
+  *
+  * Usage notes:
+  * - 4.3.1b TMS must appear high when undriven
+  * - 4.3.1c (rec) minimize load presented by TMS
+  * - 4.4.1b TDI must appear high when undriven
+  * - 4.5.1b TDO must be inactive except when shifting data (undriven? 6.1.2)
+  */
 class JtagTap() extends Module {
   val io = IO(new JtagBlockIO)
 
