@@ -70,14 +70,14 @@ object JtagState {
   case object Exit1DR extends State(1)
   case object PauseDR extends State(3)  // pause DR shifting
   case object Exit2DR extends State(0)
-  case object UpdateDR extends State(5)  // parallel-load output from DR shifter on TCK falling edge while in this state
+  case object UpdateDR extends State(5)  // parallel-load output from DR shifter on TCK falling edge while in this state (not a rule?)
   case object SelectIRScan extends State(4)
   case object CaptureIR extends State(14)  // parallel-load IR shifter with fixed logic values and design-specific when exiting this state (if required)
   case object ShiftIR extends State(10)  // shifts IR shifter from TDI towards TDO, last shift occurs on rising edge transition out of this state
   case object Exit1IR extends State(9)
   case object PauseIR extends State(11)  // pause IR shifting
   case object Exit2IR extends State(8)
-  case object UpdateIR extends State(13)  // latch IR shifter into IR on TCK falling edge while in this state
+  case object UpdateIR extends State(13)  // latch IR shifter into IR (changes to IR may only occur while in this state, latch on TCK falling edge?)
 }
 
 /** The JTAG state machine, implements spec 6.1.1.1a (Figure 6.1)
@@ -160,6 +160,7 @@ class JtagIO extends Bundle {
   val TMS = Input(Bool())
   val TDI = Input(Bool())
   val TDO = Output(Bool())
+  val tdo_driven = Output(Bool())  // active high (TDO pin is hi-Z when low)
 }
 
 /** JTAG block internal status information, for testing purposes.
@@ -176,6 +177,30 @@ class JtagBlockIO(irLength: Int) extends Bundle {
   val status = new JtagStatus(irLength)
 }
 
+object ParallelShiftRegister {
+  /** Generates a shift register with a parallel output (all bits simultaneously visible), parallel
+    * input (load), a one-bit input (into the first element), and a shift enable signal.
+    *
+    * The input is shifted into the most significant bits.
+    *
+    * @param n bits in shift register
+    * @param input single bit input, when shift is high, this is loaded into the first element
+    * @param shift shift enable control
+    * @param load parallel load control
+    * @param loadData parallel load data
+    */
+  def apply(n: Int, shift: Bool, input: Bool, load: Bool, loadData: UInt): UInt = {
+    val regs = (0 until n) map (x => Reg(Bool()))
+    when (shift) {
+      regs(0) := input
+      (1 until n) map (x => regs(x) := regs(x-1))
+    } .elsewhen (load) {
+      (0 until n) map (x => regs(x) := loadData(x))
+    }
+    Cat(regs)
+  }
+}
+
 /** JTAG TAP internal block, that has a overridden clock so registers can be clocked on TCK rising.
   *
   * Misc notes:
@@ -186,16 +211,47 @@ class JtagBlockIO(irLength: Int) extends Bundle {
   */
 class JtagTapInternal(mod_clock: Clock, irLength: Int)
     extends Module(override_clock=Some(mod_clock)) {
-  require(irLength >= 2)
+  require(irLength >= 2)  // 7.1.1a
 
   val io = IO(new JtagBlockIO(irLength))
 
   val tms = Reg(Bool(), next=io.jtag.TMS)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   val tdi = Reg(Bool(), next=io.jtag.TDI)  // 4.3.2a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
+  val tdo_driven = Wire(Bool())
   io.jtag.TDO := NegativeEdgeLatch(clock, tdo, 1)  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
+  io.jtag.tdo_driven := NegativeEdgeLatch(clock, tdo_driven, 1)
 
-  tdo := tdi  // test
+  //
+  // JTAG state machine
+  //
+  val stateMachine = Module(new JtagStateMachine)
+  stateMachine.io.TMS := tms
+  val currState = stateMachine.io.currState
+
+  //
+  // Shift Registers
+  //
+  val irShifter = ParallelShiftRegister(irLength, currState === JtagState.ShiftIR.U, tdi,
+      currState === JtagState.CaptureIR.U, "b01".U)
+  val activeInstruction = Reg(UInt(irLength.W)) // TODO: initialize in IDCODE or BYPASS
+  when (currState === JtagState.UpdateIR.U) {
+    activeInstruction := irShifter
+  }
+  io.status.instruction := activeInstruction
+
+  //
+  // Output Control
+  //
+  when (currState === JtagState.ShiftDR.U) {
+    // TODO: DR shift
+    tdo_driven := true.B
+  } .elsewhen (currState === JtagState.ShiftIR.U) {
+    tdo := irShifter(0)
+    tdo_driven := true.B
+  } .otherwise {
+    tdo_driven := false.B
+  }
 
   // Notes
   // IR should be initialized to IDCODE instruction (when available) or BYPASS
