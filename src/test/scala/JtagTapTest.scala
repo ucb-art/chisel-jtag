@@ -52,6 +52,8 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
   val jtag: JtagIO
   val status: JtagStatus
 
+  var expectedInstruction: Option[Int] = None  // expected instruction (status.instruction) after TCK low
+
   /** Convenience function for stepping a JTAG cycle (TCK high -> low -> high) and checking basic
     * JTAG values.
     *
@@ -74,10 +76,21 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     poke(jtag.TMS, tms)
     poke(jtag.TDI, tdi)
     expect(jtag.TDO, expectedTdo, s"$msg: TDO")
+    expectedInstruction match {
+      case Some(instruction) => expect(status.instruction, instruction, s"$msg: expected instruction $instruction")
+      case None =>
+    }
 
     poke(jtag.TCK, 1)
     step(1)
     expect(jtag.TDO, expectedTdo, s"$msg: TDO")
+  }
+
+  /** After every TCK falling edge following this call, expect this instruction on the status line.
+    * None means to not check the instruction output.
+    */
+  def expectInstruction(expected: Option[Int]) {
+    expectedInstruction = expected
   }
 
   /** Resets the test block using 5 TMS transitions
@@ -97,12 +110,15 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
 }
 
 class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) with JtagTestUtilities {
+  import BinaryParse._
+
   val jtag = c.io.jtag
   val status = c.io.status
 
   tmsReset()
 
   // Test sequence in Figure 6-3 (instruction scan), starting with the half-cycle off-screen
+  expectInstruction(Some("00".b))
   jtagCycle(1, JtagState.TestLogicReset)
   jtagCycle(0, JtagState.TestLogicReset)
   jtagCycle(1, JtagState.RunTestIdle)
@@ -119,9 +135,17 @@ class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) with JtagTestUtili
   jtagCycle(0, JtagState.ShiftIR, tdi=1, expectedTdo=0)
   jtagCycle(0, JtagState.ShiftIR, tdi=1, expectedTdo=0)
   jtagCycle(0, JtagState.ShiftIR, tdi=0, expectedTdo=1)
-  jtagCycle(1, JtagState.ShiftIR, tdi=0, expectedTdo=1)
+  jtagCycle(1, JtagState.ShiftIR, tdi=1, expectedTdo=1)
   jtagCycle(1, JtagState.Exit1IR)
+  expectInstruction(Some("10".b))
   jtagCycle(0, JtagState.UpdateIR)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
 }
 
 class JtagTapSpec extends ChiselFlatSpec {
