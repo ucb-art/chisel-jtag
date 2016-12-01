@@ -63,22 +63,25 @@ object JtagState {
   * Usage notes:
   * - 6.1.1.1b state transitions occur on TCK rising edge
   * - 6.1.1.1c actions can occur on the following TCK falling or rising edge
+  *
+  * Misc notes:
+  * - Implementation differs from Figure 6-5, 6-6: this assumes TMS is latched on the rising edge,
+  *   so the current state logic inside is combinational. This ensures a clean TMS latch but may
+  *   result in higher combinational path delays to get the current state.
   */
 class JtagStateMachine extends Module {
   class StateMachineIO extends Bundle {
     val TMS = Input(Bool())
     val currState = Output(JtagState.State.chiselType())
-    val nextState = Output(JtagState.State.chiselType())
   }
   val io = IO(new StateMachineIO)
 
-  val currState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U)
+  val lastState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U)
   val nextState = Wire(JtagState.State.chiselType())
-  currState := nextState
-  io.currState := currState
-  io.nextState := nextState
+  lastState := nextState
+  io.currState := nextState
 
-  switch (currState) {
+  switch (lastState) {
     is (JtagState.TestLogicReset.U) {
       nextState := Mux(io.TMS, JtagState.TestLogicReset.U, JtagState.RunTestIdle.U)
     }

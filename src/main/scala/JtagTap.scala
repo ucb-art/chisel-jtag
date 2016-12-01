@@ -58,7 +58,6 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   val io = IO(new JtagBlockIO(irLength, numInstructions))
 
   val tms = Reg(Bool(), next=io.jtag.TMS)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
-  val tdi = Reg(Bool(), next=io.jtag.TDI)  // 4.3.2a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
   val tdo_driven = Wire(Bool())
   io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo)  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
@@ -70,6 +69,7 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   val stateMachine = Module(new JtagStateMachine)
   stateMachine.io.TMS := tms
   val currState = stateMachine.io.currState
+  io.status.state := stateMachine.io.currState
 
   //
   // Shift Registers
@@ -78,7 +78,8 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
   // 7.2.1a behavior of instruction register and shifters
   // 7.2.1c shifter shifts on TCK rising edge
-  val irShifter = ParallelShiftRegister(irLength, currState === JtagState.ShiftIR.U, tdi,
+  // 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
+  val irShifter = ParallelShiftRegister(irLength, currState === JtagState.ShiftIR.U, io.jtag.TDI,
       currState === JtagState.CaptureIR.U, "b01".U)
   val updateInstruction = Wire(Bool())
 
