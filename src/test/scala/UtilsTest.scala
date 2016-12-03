@@ -70,17 +70,6 @@ class NegativeEdgeLatchUIntTest(val c: NegativeEdgeLatchTestModule[UInt]) extend
   step(1)
   expect(c.io.out, 2)
 }
-/** Test helper object for simple conversions from string to literal.
-  */
-object BinaryParse {
-  // from https://stackoverflow.com/questions/7197119/how-to-write-binary-literals-in-scala
-  implicit class IntToBase(val digits: String) extends AnyVal {
-    def base(b:Int) = Integer.parseInt(digits, b)
-    def b = base(2)
-    def o = base(8)
-    def x = base(16)
-  }
-}
 
 class NegativeEdgeLatchTestModule[T <: Data](dataType: T) extends Module {
   class ModIO extends Bundle {

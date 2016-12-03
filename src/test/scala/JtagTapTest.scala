@@ -7,47 +7,6 @@ import Chisel.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
 import chisel3._
 import jtag._
 
-trait TristateTestUtility extends PeekPokeTester[chisel3.Module] {
-  import scala.language.implicitConversions
-
-  trait TristateValue
-  case object TristateLow extends TristateValue
-  case object TristateHigh extends TristateValue
-  case object Z extends TristateValue
-  case object X extends TristateValue
-
-  implicit def toTristateValue(x: Int) : TristateValue = {
-    x match {
-      case 0 => TristateLow
-      case 1 => TristateHigh
-    }
-  }
-
-  def expect(node: Tristate, value: TristateValue, msg: String) {
-    value match {
-      case TristateLow => {
-        expect(node.driven, 1, s"$msg: expected tristate driven=1")
-        expect(node.data, 0, s"$msg: expected tristate data=0")
-      }
-      case TristateHigh => {
-        expect(node.driven, 1, s"$msg: expected tristate driven=1")
-        expect(node.data, 1, s"$msg: expected tristate data=1")
-      }
-      case Z => {
-        expect(node.driven, 0, s"$msg: expected tristate driven=0")
-      }
-    }
-  }
-
-  def poke(node: Bool, value: TristateValue) {
-    value match {
-      case TristateLow => poke(node, 0)
-      case TristateHigh => poke(node, 1)
-      case X => poke(node, 0)
-    }
-  }
-}
-
 trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTestUtility {
   val jtag: JtagIO
   val status: JtagStatus

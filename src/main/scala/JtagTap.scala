@@ -77,8 +77,6 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   // 7.1.1d IR shifter two LSBs must be b01 pattern
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
   // 7.2.1a behavior of instruction register and shifters
-  // 7.2.1c shifter shifts on TCK rising edge
-  // 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   val irShifter = ParallelShiftRegister(irLength, currState === JtagState.ShiftIR.U, io.jtag.TDI,
       currState === JtagState.CaptureIR.U, "b01".U)
   val updateInstruction = Wire(Bool())
