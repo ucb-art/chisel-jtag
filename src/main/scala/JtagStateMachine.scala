@@ -7,7 +7,7 @@ import chisel3.util._
 
 object JtagState {
   sealed abstract class State(val id: Int) {
-    def U: UInt = id.U
+    def U: UInt = id.U(State.width.W)
   }
 
   object State {

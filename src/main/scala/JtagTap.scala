@@ -17,7 +17,8 @@ class JtagIO extends Bundle {
 
 /** JTAG block output signals.
   */
-class JtagOutput(numInstructions: Int) extends Bundle {
+class JtagOutput(instructions: Map[Int, Int]) extends Bundle {
+  val numInstructions = instructions.valuesIterator.max + 1
   // A Vec of Bools, with the high one indicating the active instruction
   // If multiple instructions mapped to the same IR code, they may be simultaneously high
   // Instruction 0 is high on reset
@@ -34,28 +35,28 @@ class JtagStatus(irLength: Int) extends Bundle {
 
 /** Aggregate JTAG block IO
   */
-class JtagBlockIO(irLength: Int, numInstructions: Int) extends Bundle {
+class JtagBlockIO(irLength: Int, instructions: Map[Int, Int]) extends Bundle {
   val jtag = new JtagIO
-  val output = new JtagOutput(numInstructions)
+  val dataChainOut = Output(new ShifterIO)
+  val dataChainIn = Input(new ShifterIO)
+  val output = new JtagOutput(instructions)
 
   val status = new JtagStatus(irLength)
 }
 
-/** JTAG TAP internal block, that has a overridden clock so registers can be clocked on TCK rising.
+/** JTAG TAP controller internal block, responsible for instruction decode and data register chain
+  * control signal generation.
   *
   * Misc notes:
   * - Figure 6-3 and 6-4 provides examples with timing behavior
-  *
-  * TODO:
-  * - Implement test mode persistence (TMP) controller, 6.2
   */
-class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, Int])
-    extends Module(override_clock=Some(mod_clock)) {
+class JtagTapInternal(irLength: Int, initialInstruction: Int, instructions: Map[Int, Int]) extends Module {
   require(irLength >= 2)  // 7.1.1a
+
   val numInstructions = instructions.valuesIterator.max + 1
   require(numInstructions >= 1)
 
-  val io = IO(new JtagBlockIO(irLength, numInstructions))
+  val io = IO(new JtagBlockIO(irLength, instructions))
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
   val tdo_driven = Wire(Bool())
@@ -71,7 +72,7 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   io.status.state := stateMachine.io.currState
 
   //
-  // Shift Registers
+  // Instruction Register
   //
   // 7.1.1d IR shifter two LSBs must be b01 pattern
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
@@ -92,7 +93,7 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
 
   when (currState === JtagState.TestLogicReset.U) {
     // 7.2.1e load IDCODE or BYPASS instruction after entry into TestLogicReset
-    nextActiveInstruction := 0.U // TODO IDCODE or BYPASS
+    nextActiveInstruction := initialInstruction.U(irLength.W)
     nextDecodedInstruction(0) := true.B
     (1 until numInstructions) map (x => nextDecodedInstruction(x) := false.B)
     updateInstruction := true.B
@@ -101,7 +102,7 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
     (0 until numInstructions) map { x =>
       val icodes = instructions.toSeq.  // to tuples of (instr code, bitvector)
         filter(_._2 == x).  // only where bitvector is position under consideration
-        map(_._1 === nextActiveInstruction)  // to list of instr codes === curr instruction
+        map(_._1.U(irLength.W) === nextActiveInstruction)  // to list of instr codes === curr instruction
       nextDecodedInstruction(x) := icodes.fold(false.B)(_ || _)
     }
     updateInstruction := true.B
@@ -111,10 +112,18 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   io.status.instruction := activeInstruction
 
   //
+  // Data Register
+  //
+  io.dataChainOut.shift := currState === JtagState.ShiftDR.U
+  io.dataChainOut.data := io.jtag.TDI
+  io.dataChainOut.capture := currState === JtagState.CaptureDR.U
+  io.dataChainOut.update := currState === JtagState.UpdateDR.U
+
+  //
   // Output Control
   //
   when (currState === JtagState.ShiftDR.U) {
-    // TODO: DR shift
+    tdo := io.dataChainIn.data
     tdo_driven := true.B
   } .elsewhen (currState === JtagState.ShiftIR.U) {
     tdo := irShifter.io.chainOut.data
@@ -122,12 +131,9 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   } .otherwise {
     tdo_driven := false.B
   }
-
-  // Notes
-  // IR should be initialized to IDCODE instruction (when available) or BYPASS
 }
 
-/** JTAG TAP block, clocked from TCK.
+/** JTAG TAP generator, must be clocked from TCK.
   *
   * @param irLength length, in bits, of instruction register, must be at least 2
   * @param instruction a map of instruction code literal to output bitvector position representing
@@ -141,9 +147,9 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   * - 6.1.3.1b TAP controller must not be (re-?)initialized by system reset (allows boundary-scan testing of reset pin)
   *   - 6.1 TAP controller can be initialized by a on-chip power on reset generator, the same one that would initialize system logic
   */
-class JtagTap(irLength: Int, instructions: Map[UInt, Int]) extends Module {
-  val io = IO(new JtagBlockIO(irLength, instructions.valuesIterator.max + 1))
+class JtagTapController(irLength: Int, instructions: Map[Int, Int]) extends Module {
+  val io = IO(new JtagBlockIO(irLength, instructions))
 
-  val tap = Module(new JtagTapInternal(io.jtag.TCK.asClock, irLength, instructions))
-  io <> tap.io
+  val controllerInternal = Module(new JtagTapInternal(irLength, 0, instructions))
+  io <> controllerInternal.io
 }

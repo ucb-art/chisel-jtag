@@ -9,10 +9,10 @@ import chisel3.util._
   * Can be chained together.
   */
 class ShifterIO extends Bundle {
-  val shift = Input(Bool())  // advance the scan chain on clock high
-  val data = Input(Bool())  // as input: bit to be captured into shifter MSB on next rising edge; as output: value of shifter LSB
-  val capture = Input(Bool())  // high in the CaptureIR/DR state when this chain is selected
-  val update = Input(Bool())  // high in the UpdateIR/DR state when this chain is selected
+  val shift = Bool()  // advance the scan chain on clock high
+  val data = Bool()  // as input: bit to be captured into shifter MSB on next rising edge; as output: value of shifter LSB
+  val capture = Bool()  // high in the CaptureIR/DR state when this chain is selected
+  val update = Bool()  // high in the UpdateIR/DR state when this chain is selected
 
   /** Sets a output shifter IO's control signals from a input shifter IO's control signals.
     */
@@ -24,8 +24,8 @@ class ShifterIO extends Bundle {
 }
 
 trait ChainIO extends Bundle {
-  val chainIn = new ShifterIO
-  val chainOut = (new ShifterIO).flip()
+  val chainIn = Input(new ShifterIO)
+  val chainOut = Output(new ShifterIO)
 }
 
 /** Trait that all JTAG chains (data and instruction registers) must extend, providing basic chain

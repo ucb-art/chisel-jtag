@@ -68,7 +68,7 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
   }
 }
 
-class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) with JtagTestUtilities {
+class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTestUtilities {
   import BinaryParse._
 
   val jtag = c.io.jtag
@@ -107,10 +107,24 @@ class JtagTapTester(val c: JtagTap) extends PeekPokeTester(c) with JtagTestUtili
   jtagCycle(0, JtagState.RunTestIdle)
 }
 
+class JtagTapModule(irLength: Int, instructions: Map[Int, Int]) extends Module {
+  class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
+    val io = IO(new JtagBlockIO(irLength, instructions))
+
+    val tap = Module(new JtagTapController(irLength, instructions))
+    io <> tap.io
+  }
+
+  val io = IO(new JtagBlockIO(irLength, instructions))
+
+  val tap = Module(new JtagTapClocked(io.jtag.TCK.asClock))
+  io <> tap.io
+}
+
 class JtagTapSpec extends ChiselFlatSpec {
   "JTAG TAP" should "work" in {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => new JtagTap(2, Map(0.U -> 0)), backendType="verilator") {
+    Driver(() => new JtagTapModule(2, Map(0 -> 0)), backendType="verilator") {
       c => new JtagTapTester(c)
     } should be (true)
   }
