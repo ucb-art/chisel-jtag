@@ -8,7 +8,7 @@ import chisel3.util._
 /** Base JTAG shifter IO, viewed from input to shift register chain.
   * Can be chained together.
   */
-class JtagShifterIO extends Bundle {
+class ShifterIO extends Bundle {
   val shift = Input(Bool())  // advance the scan chain on clock high
   val data = Input(Bool())  // as input: bit to be captured into shifter MSB on next rising edge; as output: value of shifter LSB
   val capture = Input(Bool())  // high in the CaptureIR/DR state when this chain is selected
@@ -16,33 +16,33 @@ class JtagShifterIO extends Bundle {
 
   /** Sets a output shifter IO's control signals from a input shifter IO's control signals.
     */
-  def chainFrom(in: JtagShifterIO) {
+  def chainControlFrom(in: ShifterIO) {
     shift := in.shift
     capture := in.capture
     update := in.update
   }
 }
 
-trait JtagChainIO extends Bundle {
-  val chainIn = new JtagShifterIO
-  val chainOut = (new JtagShifterIO).flip()
+trait ChainIO extends Bundle {
+  val chainIn = new ShifterIO
+  val chainOut = (new ShifterIO).flip()
 }
 
 /** Trait that all JTAG chains (data and instruction registers) must extend, providing basic chain
   * IO.
   */
-trait JtagChain extends Module {
-  val io: JtagChainIO
+trait Chain extends Module {
+  val io: ChainIO
 }
 
 /** One-element shift register, data register for bypass mode.
   *
   * Implements Clause 10.
   */
-class JtagBypassChain extends JtagChain {
-  class ModIO extends JtagChainIO
+class JtagBypassChain extends Chain {
+  class ModIO extends ChainIO
   val io = IO(new ModIO)
-  io.chainOut chainFrom io.chainIn
+  io.chainOut chainControlFrom io.chainIn
 
   val reg = Reg(Bool())  // 10.1.1a single shift register stage
 
@@ -65,18 +65,18 @@ class JtagBypassChain extends JtagChain {
   * 7.2.1c shifter shifts on TCK rising edge
   * 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   */
-class JtagCaptureUpdateChain(n: Int) extends JtagChain {
+class CaptureUpdateChain(n: Int) extends Chain {
   class CaptureIO extends Bundle {
     val bits = Input(UInt(n.W))  // data to capture, should be always valid
     val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
   }
 
-  class ModIO extends JtagChainIO {
+  class ModIO extends ChainIO {
     val capture = new CaptureIO()
     val update = Output(Valid(UInt(n.W)))  // valid high when in update state (single cycle), contents may change any time after
   }
   val io = IO(new ModIO)
-  io.chainOut chainFrom io.chainIn
+  io.chainOut chainControlFrom io.chainIn
 
   val regs = (0 until n) map (x => Reg(Bool()))
 

@@ -53,7 +53,7 @@ class JtagBypassChainTest(val c: JtagBypassChain) extends PeekPokeTester(c) {
   expect(c.io.chainOut.data, 0)
 }
 
-class JtagCaptureUpdateChainTest(val c: JtagCaptureUpdateChain) extends PeekPokeTester(c) {
+class CaptureUpdateChainTest(val c: CaptureUpdateChain) extends PeekPokeTester(c) {
   import BinaryParse._
 
   poke(c.io.chainIn.shift, 0)
@@ -171,14 +171,14 @@ class JtagCaptureUpdateChainTest(val c: JtagCaptureUpdateChain) extends PeekPoke
 }
 
 class JtagShifterSpec extends ChiselFlatSpec {
-  "JTAG bypass chain" should "work" in {
+  "JATG bypass chain" should "work" in {
     Driver(() => new JtagBypassChain()) {
       c => new JtagBypassChainTest(c)
     } should be (true)
   }
-  "8-bit JTAG capture-update chain" should "work" in {
-    Driver(() => new JtagCaptureUpdateChain(8)) {
-      c => new JtagCaptureUpdateChainTest(c)
+  "8-bit capture-update chain" should "work" in {
+    Driver(() => new CaptureUpdateChain(8)) {
+      c => new CaptureUpdateChainTest(c)
     } should be (true)
   }
 }

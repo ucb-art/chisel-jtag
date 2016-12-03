@@ -63,18 +63,18 @@ object JtagState {
   * Usage notes:
   * - 6.1.1.1b state transitions occur on TCK rising edge
   * - 6.1.1.1c actions can occur on the following TCK falling or rising edge
-  *
-  * Misc notes:
-  * - Implementation differs from Figure 6-5, 6-6: this assumes TMS is latched on the rising edge,
-  *   so the current state logic inside is combinational. This ensures a clean TMS latch but may
-  *   result in higher combinational path delays to get the current state.
   */
 class JtagStateMachine extends Module {
   class StateMachineIO extends Bundle {
-    val TMS = Input(Bool())
+    val tms = Input(Bool())
     val currState = Output(JtagState.State.chiselType())
   }
   val io = IO(new StateMachineIO)
+
+  // TMS is captured as a single signal, rather than fed directly into the next state logic.
+  // This increases the state computation delay at the beginning of a cycle (as opposed to near the
+  // end), but theoretically allows a cleaner capture.
+  val tms = Reg(Bool(), next=io.tms)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
 
   val lastState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U)
   val nextState = Wire(JtagState.State.chiselType())
@@ -83,52 +83,52 @@ class JtagStateMachine extends Module {
 
   switch (lastState) {
     is (JtagState.TestLogicReset.U) {
-      nextState := Mux(io.TMS, JtagState.TestLogicReset.U, JtagState.RunTestIdle.U)
+      nextState := Mux(tms, JtagState.TestLogicReset.U, JtagState.RunTestIdle.U)
     }
     is (JtagState.RunTestIdle.U) {
-      nextState := Mux(io.TMS, JtagState.SelectDRScan.U, JtagState.RunTestIdle.U)
+      nextState := Mux(tms, JtagState.SelectDRScan.U, JtagState.RunTestIdle.U)
     }
     is (JtagState.SelectDRScan.U) {
-      nextState := Mux(io.TMS, JtagState.SelectIRScan.U, JtagState.CaptureDR.U)
+      nextState := Mux(tms, JtagState.SelectIRScan.U, JtagState.CaptureDR.U)
     }
     is (JtagState.CaptureDR.U) {
-      nextState := Mux(io.TMS, JtagState.Exit1DR.U, JtagState.ShiftDR.U)
+      nextState := Mux(tms, JtagState.Exit1DR.U, JtagState.ShiftDR.U)
     }
     is (JtagState.ShiftDR.U) {
-      nextState := Mux(io.TMS, JtagState.Exit1DR.U, JtagState.ShiftDR.U)
+      nextState := Mux(tms, JtagState.Exit1DR.U, JtagState.ShiftDR.U)
     }
     is (JtagState.Exit1DR.U) {
-      nextState := Mux(io.TMS, JtagState.UpdateDR.U, JtagState.PauseDR.U)
+      nextState := Mux(tms, JtagState.UpdateDR.U, JtagState.PauseDR.U)
     }
     is (JtagState.PauseDR.U) {
-      nextState := Mux(io.TMS, JtagState.Exit2DR.U, JtagState.PauseDR.U)
+      nextState := Mux(tms, JtagState.Exit2DR.U, JtagState.PauseDR.U)
     }
     is (JtagState.Exit2DR.U) {
-      nextState := Mux(io.TMS, JtagState.UpdateDR.U, JtagState.ShiftDR.U)
+      nextState := Mux(tms, JtagState.UpdateDR.U, JtagState.ShiftDR.U)
     }
     is (JtagState.UpdateDR.U) {
-      nextState := Mux(io.TMS, JtagState.SelectDRScan.U, JtagState.RunTestIdle.U)
+      nextState := Mux(tms, JtagState.SelectDRScan.U, JtagState.RunTestIdle.U)
     }
     is (JtagState.SelectIRScan.U) {
-      nextState := Mux(io.TMS, JtagState.TestLogicReset.U, JtagState.CaptureIR.U)
+      nextState := Mux(tms, JtagState.TestLogicReset.U, JtagState.CaptureIR.U)
     }
     is (JtagState.CaptureIR.U) {
-      nextState := Mux(io.TMS, JtagState.Exit1IR.U, JtagState.ShiftIR.U)
+      nextState := Mux(tms, JtagState.Exit1IR.U, JtagState.ShiftIR.U)
     }
     is (JtagState.ShiftIR.U) {
-      nextState := Mux(io.TMS, JtagState.Exit1IR.U, JtagState.ShiftIR.U)
+      nextState := Mux(tms, JtagState.Exit1IR.U, JtagState.ShiftIR.U)
     }
     is (JtagState.Exit1IR.U) {
-      nextState := Mux(io.TMS, JtagState.UpdateIR.U, JtagState.PauseIR.U)
+      nextState := Mux(tms, JtagState.UpdateIR.U, JtagState.PauseIR.U)
     }
     is (JtagState.PauseIR.U) {
-      nextState := Mux(io.TMS, JtagState.Exit2IR.U, JtagState.PauseIR.U)
+      nextState := Mux(tms, JtagState.Exit2IR.U, JtagState.PauseIR.U)
     }
     is (JtagState.Exit2IR.U) {
-      nextState := Mux(io.TMS, JtagState.UpdateIR.U, JtagState.ShiftIR.U)
+      nextState := Mux(tms, JtagState.UpdateIR.U, JtagState.ShiftIR.U)
     }
     is (JtagState.UpdateIR.U) {
-      nextState := Mux(io.TMS, JtagState.SelectDRScan.U, JtagState.RunTestIdle.U)
+      nextState := Mux(tms, JtagState.SelectDRScan.U, JtagState.RunTestIdle.U)
     }
   }
 }
