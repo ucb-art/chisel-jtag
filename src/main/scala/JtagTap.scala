@@ -17,28 +17,23 @@ class JtagIO extends Bundle {
 
 /** JTAG block output signals.
   */
-class JtagOutput(instructions: Map[Int, Int]) extends Bundle {
-  val numInstructions = instructions.valuesIterator.max + 1
-  // A Vec of Bools, with the high one indicating the active instruction
-  // If multiple instructions mapped to the same IR code, they may be simultaneously high
-  // Instruction 0 is high on reset
-  // Updated on TCK falling edge, registered to be glitch-free (as recommended by 7.2.2)
-  val instruction = Output(Vec(numInstructions, Bool()))
+class JtagOutput(irLength: Int) extends Bundle {
+  val instruction = Output(UInt(irLength.W))  // current active instruction
 }
 
 /** JTAG block internal status information, for testing purposes.
   */
 class JtagStatus(irLength: Int) extends Bundle {
   val state = Output(JtagState.State.chiselType())  // state, transitions on TCK rising edge
-  val instruction = Output(UInt(irLength.W))  // current active instruction
+
 }
 
 /** Aggregate JTAG block IO.
   */
-class JtagBlockIO(irLength: Int, instructions: Map[Int, Int]) extends Bundle {
+class JtagBlockIO(irLength: Int) extends Bundle {
   val jtag = new JtagIO
 
-  val output = new JtagOutput(instructions)
+  val output = new JtagOutput(irLength)
 
   val status = new JtagStatus(irLength)
   val dataChainOut = Output(new ShifterIO)
@@ -51,13 +46,10 @@ class JtagBlockIO(irLength: Int, instructions: Map[Int, Int]) extends Bundle {
   * Misc notes:
   * - Figure 6-3 and 6-4 provides examples with timing behavior
   */
-class JtagTapController(irLength: Int, initialInstruction: Int, instructions: Map[Int, Int]) extends Module {
+class JtagTapController(irLength: Int, initialInstruction: Int) extends Module {
   require(irLength >= 2)  // 7.1.1a
 
-  val numInstructions = instructions.valuesIterator.max + 1
-  require(numInstructions >= 1)
-
-  val io = IO(new JtagBlockIO(irLength, instructions))
+  val io = IO(new JtagBlockIO(irLength))
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
   val tdo_driven = Wire(Bool())
@@ -89,28 +81,18 @@ class JtagTapController(irLength: Int, initialInstruction: Int, instructions: Ma
 
   val nextActiveInstruction = Wire(UInt(irLength.W))
   val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
-  val nextDecodedInstruction = Wire(Vec(numInstructions, Bool()))
-  val decodedInstruction = NegativeEdgeLatch(clock, nextDecodedInstruction, updateInstruction)
 
   when (currState === JtagState.TestLogicReset.U) {
     // 7.2.1e load IDCODE or BYPASS instruction after entry into TestLogicReset
     nextActiveInstruction := initialInstruction.U(irLength.W)
-    nextDecodedInstruction(0) := true.B
-    (1 until numInstructions) map (x => nextDecodedInstruction(x) := false.B)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {
     nextActiveInstruction := irShifter.io.update.bits
-    (0 until numInstructions) map { x =>
-      val icodes = instructions.toSeq.  // to tuples of (instr code, bitvector)
-        filter(_._2 == x).  // only where bitvector is position under consideration
-        map(_._1.U(irLength.W) === nextActiveInstruction)  // to list of instr codes === curr instruction
-      nextDecodedInstruction(x) := icodes.fold(false.B)(_ || _)
-    }
     updateInstruction := true.B
   } .otherwise {
     updateInstruction := false.B
   }
-  io.status.instruction := activeInstruction
+  io.output.instruction := activeInstruction
 
   //
   // Data Register
@@ -137,8 +119,6 @@ class JtagTapController(irLength: Int, initialInstruction: Int, instructions: Ma
 /** JTAG TAP generator, enclosed module must be clocked from TCK.
   *
   * @param irLength length, in bits, of instruction register, must be at least 2
-  * @param instruction a map of instruction code literal to output bitvector position representing
-  * active instruction; it is permissible to have multiple instruction codes map to the same position
   *
   * Usage notes:
   * - 4.3.1b TMS must appear high when undriven
@@ -149,8 +129,8 @@ class JtagTapController(irLength: Int, initialInstruction: Int, instructions: Ma
   *   - 6.1 TAP controller can be initialized by a on-chip power on reset generator, the same one that would initialize system logic
   */
 object JtagTapGenerator {
-  def apply(irLength: Int, instructions: Map[Int, Int]): JtagTapController = {
-    val controllerInternal = Module(new JtagTapController(irLength, 0, instructions))
+  def apply(irLength: Int, instructions: Map[Chain, Seq[Int]], idcode:Option[(Int, Int)]=None): JtagTapController = {
+    val controllerInternal = Module(new JtagTapController(irLength, 0))
 
     controllerInternal
   }

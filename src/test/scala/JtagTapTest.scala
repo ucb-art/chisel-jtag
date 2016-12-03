@@ -9,6 +9,7 @@ import jtag._
 
 trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTestUtility {
   val jtag: JtagIO
+  val output: JtagOutput
   val status: JtagStatus
 
   var expectedInstruction: Option[Int] = None  // expected instruction (status.instruction) after TCK low
@@ -36,7 +37,7 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     poke(jtag.TDI, tdi)
     expect(jtag.TDO, expectedTdo, s"$msg: TDO")
     expectedInstruction match {
-      case Some(instruction) => expect(status.instruction, instruction, s"$msg: expected instruction $instruction")
+      case Some(instruction) => expect(output.instruction, instruction, s"$msg: expected instruction $instruction")
       case None =>
     }
 
@@ -72,6 +73,7 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   import BinaryParse._
 
   val jtag = c.io.jtag
+  val output = c.io.output
   val status = c.io.status
 
   tmsReset()
@@ -107,17 +109,17 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   jtagCycle(0, JtagState.RunTestIdle)
 }
 
-class JtagTapModule(irLength: Int, instructions: Map[Int, Int]) extends Module {
+class JtagTapModule(irLength: Int) extends Module {
   class ModIO extends Bundle {
     val jtag = new JtagIO
-    val output = new JtagOutput(instructions)
+    val output = new JtagOutput(irLength)
     val status = new JtagStatus(irLength)
   }
 
   class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
     val io = IO(new ModIO)
 
-    val tap = JtagTapGenerator(irLength, instructions)
+    val tap = JtagTapGenerator(irLength, Map())
     io.jtag <> tap.io.jtag
     io.output <> tap.io.output
     io.status <> tap.io.status
@@ -132,7 +134,7 @@ class JtagTapModule(irLength: Int, instructions: Map[Int, Int]) extends Module {
 class JtagTapSpec extends ChiselFlatSpec {
   "JTAG TAP" should "work" in {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => new JtagTapModule(2, Map(0 -> 0)), backendType="verilator") {
+    Driver(() => new JtagTapModule(2), backendType="verilator") {
       c => new JtagTapTester(c)
     } should be (true)
   }
