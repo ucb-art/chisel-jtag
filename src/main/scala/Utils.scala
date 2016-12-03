@@ -5,6 +5,13 @@ package jtag
 import chisel3._
 import chisel3.util._
 
+/** Bundle representing a tristate pin.
+  */
+class Tristate extends Bundle {
+  val data = Bool()
+  val driven = Bool()  // active high, pin is hi-Z when driven is low
+}
+
 class NegativeEdgeLatch[T <: Data](clock: Clock, dataType: T)
     extends Module(override_clock=Some(clock)) {
   class IoClass extends Bundle {
@@ -31,36 +38,4 @@ object NegativeEdgeLatch {
     latch_module.io.enable := enable
     latch_module.io.output
   }
-}
-
-object ParallelShiftRegister {
-  /** Generates a shift register with a parallel output (all bits simultaneously visible), parallel
-    * input (load), a one-bit input (into the first element), and a shift enable signal.
-    *
-    * The input is shifted into the most significant bits.
-    *
-    * @param n bits in shift register
-    * @param input single bit input, when shift is high, this is loaded into the first element
-    * @param shift shift enable control
-    * @param load parallel load control
-    * @param loadData parallel load data
-    */
-  def apply(n: Int, shift: Bool, input: Bool, load: Bool, loadData: UInt): UInt = {
-    val regs = (0 until n) map (x => Reg(Bool()))
-    when (load) {
-      (0 until n) map (x => regs(x) := loadData(x))
-    } .elsewhen (shift) {
-      regs(n-1) := input
-      (0 until n-1) map (x => regs(x) := regs(x+1))
-    }
-    assert(!(shift && load))
-    Cat(regs.reverse)
-  }
-}
-
-/** Bundle representing a tristate pin.
-  */
-class Tristate extends Bundle {
-  val data = Bool()
-  val driven = Bool()  // active high, pin is hi-Z when driven is low
 }

@@ -77,8 +77,13 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
   // 7.1.1d IR shifter two LSBs must be b01 pattern
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
   // 7.2.1a behavior of instruction register and shifters
-  val irShifter = ParallelShiftRegister(irLength, currState === JtagState.ShiftIR.U, io.jtag.TDI,
-      currState === JtagState.CaptureIR.U, "b01".U)
+  val irShifter = Module(new JtagCaptureUpdateChain(irLength))
+  irShifter.io.chainIn.shift := currState === JtagState.ShiftIR.U
+  irShifter.io.chainIn.data := io.jtag.TDI
+  irShifter.io.chainIn.capture := currState === JtagState.CaptureIR.U
+  irShifter.io.chainIn.update := currState === JtagState.UpdateIR.U
+  irShifter.io.capture.bits := "b01".U
+
   val updateInstruction = Wire(Bool())
 
   val nextActiveInstruction = Wire(UInt(irLength.W))
@@ -93,11 +98,11 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
     (1 until numInstructions) map (x => nextDecodedInstruction(x) := false.B)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {
-    nextActiveInstruction := irShifter
+    nextActiveInstruction := irShifter.io.update.bits
     (0 until numInstructions) map { x =>
       val icodes = instructions.toSeq.  // to tuples of (instr code, bitvector)
         filter(_._2 == x).  // only where bitvector is position under consideration
-        map(_._1 === irShifter)  // to list of instr codes === curr instruction
+        map(_._1 === nextActiveInstruction)  // to list of instr codes === curr instruction
       nextDecodedInstruction(x) := icodes.fold(false.B)(_ || _)
     }
     updateInstruction := true.B
@@ -113,7 +118,7 @@ class JtagTapInternal(mod_clock: Clock, irLength: Int, instructions: Map[UInt, I
     // TODO: DR shift
     tdo_driven := true.B
   } .elsewhen (currState === JtagState.ShiftIR.U) {
-    tdo := irShifter(0)
+    tdo := irShifter.io.chainOut.data
     tdo_driven := true.B
   } .otherwise {
     tdo_driven := false.B
