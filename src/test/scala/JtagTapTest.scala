@@ -77,15 +77,15 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   val status = c.io.status
 
   tmsReset()
-  // Test sequence in Figure 6-3 (instruction scan), starting with the half-cycle off-screen
   expectInstruction(Some("11".b))
+  // Test sequence in Figure 6-3 (instruction scan), starting with the half-cycle off-screen
   jtagCycle(1, JtagState.TestLogicReset)
   jtagCycle(0, JtagState.TestLogicReset)
   jtagCycle(1, JtagState.RunTestIdle)
   jtagCycle(1, JtagState.SelectDRScan)
   jtagCycle(0, JtagState.SelectIRScan)
   jtagCycle(0, JtagState.CaptureIR)
-  jtagCycle(0, JtagState.ShiftIR, tdi=0, expectedTdo=1)
+  jtagCycle(0, JtagState.ShiftIR, tdi=0, expectedTdo=1)  // first two required IR capture bits
   jtagCycle(1, JtagState.ShiftIR, tdi=0, expectedTdo=0)
   jtagCycle(0, JtagState.Exit1IR)
   jtagCycle(0, JtagState.PauseIR)
@@ -108,6 +108,35 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   jtagCycle(0, JtagState.RunTestIdle)
 
   tmsReset()
+  expectInstruction(Some("11".b))
+  jtagCycle(0, JtagState.TestLogicReset)
+  // Test sequence in Figure 6-4 (data scan), starting with the half-cycle off-screen
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(1, JtagState.RunTestIdle)
+  jtagCycle(0, JtagState.SelectDRScan)
+  jtagCycle(0, JtagState.CaptureDR)
+  jtagCycle(0, JtagState.ShiftDR, tdi=1, expectedTdo=0)  // required bypass capture bit
+  jtagCycle(0, JtagState.ShiftDR, tdi=0, expectedTdo=1)
+  jtagCycle(1, JtagState.ShiftDR, tdi=1, expectedTdo=0)
+  jtagCycle(0, JtagState.Exit1DR)
+  jtagCycle(0, JtagState.PauseDR)
+  jtagCycle(0, JtagState.PauseDR)
+  jtagCycle(1, JtagState.PauseDR)
+  jtagCycle(0, JtagState.Exit2DR)
+  jtagCycle(0, JtagState.ShiftDR, tdi=1, expectedTdo=1)
+  jtagCycle(0, JtagState.ShiftDR, tdi=1, expectedTdo=1)
+  jtagCycle(0, JtagState.ShiftDR, tdi=0, expectedTdo=1)
+  jtagCycle(1, JtagState.ShiftDR, tdi=0, expectedTdo=0)
+  jtagCycle(1, JtagState.Exit1DR)
+  jtagCycle(0, JtagState.UpdateDR)
+  jtagCycle(0, JtagState.RunTestIdle)
+  jtagCycle(1, JtagState.RunTestIdle)
+  jtagCycle(1, JtagState.SelectDRScan)  // Fig 6-4 says "Select-IR-Scan", seems like a typo
+  jtagCycle(1, JtagState.SelectIRScan)
+  jtagCycle(1, JtagState.TestLogicReset)
+  jtagCycle(1, JtagState.TestLogicReset)
+  jtagCycle(1, JtagState.TestLogicReset)
 }
 
 class JtagTapModule(irLength: Int) extends Module {
