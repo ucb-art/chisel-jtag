@@ -33,15 +33,16 @@ class JtagStatus(irLength: Int) extends Bundle {
   val instruction = Output(UInt(irLength.W))  // current active instruction
 }
 
-/** Aggregate JTAG block IO
+/** Aggregate JTAG block IO.
   */
 class JtagBlockIO(irLength: Int, instructions: Map[Int, Int]) extends Bundle {
   val jtag = new JtagIO
-  val dataChainOut = Output(new ShifterIO)
-  val dataChainIn = Input(new ShifterIO)
+
   val output = new JtagOutput(instructions)
 
   val status = new JtagStatus(irLength)
+  val dataChainOut = Output(new ShifterIO)
+  val dataChainIn = Input(new ShifterIO)
 }
 
 /** JTAG TAP controller internal block, responsible for instruction decode and data register chain
@@ -50,7 +51,7 @@ class JtagBlockIO(irLength: Int, instructions: Map[Int, Int]) extends Bundle {
   * Misc notes:
   * - Figure 6-3 and 6-4 provides examples with timing behavior
   */
-class JtagTapInternal(irLength: Int, initialInstruction: Int, instructions: Map[Int, Int]) extends Module {
+class JtagTapController(irLength: Int, initialInstruction: Int, instructions: Map[Int, Int]) extends Module {
   require(irLength >= 2)  // 7.1.1a
 
   val numInstructions = instructions.valuesIterator.max + 1
@@ -133,7 +134,7 @@ class JtagTapInternal(irLength: Int, initialInstruction: Int, instructions: Map[
   }
 }
 
-/** JTAG TAP generator, must be clocked from TCK.
+/** JTAG TAP generator, enclosed module must be clocked from TCK.
   *
   * @param irLength length, in bits, of instruction register, must be at least 2
   * @param instruction a map of instruction code literal to output bitvector position representing
@@ -147,9 +148,10 @@ class JtagTapInternal(irLength: Int, initialInstruction: Int, instructions: Map[
   * - 6.1.3.1b TAP controller must not be (re-?)initialized by system reset (allows boundary-scan testing of reset pin)
   *   - 6.1 TAP controller can be initialized by a on-chip power on reset generator, the same one that would initialize system logic
   */
-class JtagTapController(irLength: Int, instructions: Map[Int, Int]) extends Module {
-  val io = IO(new JtagBlockIO(irLength, instructions))
+object JtagTapGenerator {
+  def apply(irLength: Int, instructions: Map[Int, Int]): JtagTapController = {
+    val controllerInternal = Module(new JtagTapController(irLength, 0, instructions))
 
-  val controllerInternal = Module(new JtagTapInternal(irLength, 0, instructions))
-  io <> controllerInternal.io
+    controllerInternal
+  }
 }

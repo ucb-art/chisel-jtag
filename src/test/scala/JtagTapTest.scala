@@ -108,14 +108,22 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
 }
 
 class JtagTapModule(irLength: Int, instructions: Map[Int, Int]) extends Module {
-  class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
-    val io = IO(new JtagBlockIO(irLength, instructions))
-
-    val tap = Module(new JtagTapController(irLength, instructions))
-    io <> tap.io
+  class ModIO extends Bundle {
+    val jtag = new JtagIO
+    val output = new JtagOutput(instructions)
+    val status = new JtagStatus(irLength)
   }
 
-  val io = IO(new JtagBlockIO(irLength, instructions))
+  class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
+    val io = IO(new ModIO)
+
+    val tap = JtagTapGenerator(irLength, instructions)
+    io.jtag <> tap.io.jtag
+    io.output <> tap.io.output
+    io.status <> tap.io.status
+  }
+
+  val io = IO(new ModIO)
 
   val tap = Module(new JtagTapClocked(io.jtag.TCK.asClock))
   io <> tap.io
