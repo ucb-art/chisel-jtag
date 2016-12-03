@@ -83,7 +83,6 @@ class JtagTapController(irLength: Int, initialInstruction: Int) extends Module {
   val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
 
   when (currState === JtagState.TestLogicReset.U) {
-    // 7.2.1e load IDCODE or BYPASS instruction after entry into TestLogicReset
     nextActiveInstruction := initialInstruction.U(irLength.W)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {
@@ -116,57 +115,67 @@ class JtagTapController(irLength: Int, initialInstruction: Int) extends Module {
   }
 }
 
-/** JTAG TAP generator, enclosed module must be clocked from TCK.
-  *
-  * @param irLength length, in bits, of instruction register, must be at least 2
-  * @param instructions map of data register chains to instruction codes that select that data register; instruction codes must be unique
-  * @param idcode optional idcode, tuple of (instruction code, idcode)
-  *
-  * @note all other instruction codes (not part of instructions or idcode) map to BYPASS
-  * @note initial instruction is idcode (if supported), otherwise all ones BYPASS
-  *
-  * Usage notes:
-  * - 4.3.1b TMS must appear high when undriven
-  * - 4.3.1c (rec) minimize load presented by TMS
-  * - 4.4.1b TDI must appear high when undriven
-  * - 4.5.1b TDO must be inactive except when shifting data (undriven? 6.1.2)
-  * - 6.1.3.1b TAP controller must not be (re-?)initialized by system reset (allows boundary-scan testing of reset pin)
-  *   - 6.1 TAP controller can be initialized by a on-chip power on reset generator, the same one that would initialize system logic
-  *
-  * TODO:
-  * - support concatenated scan chains
-  */
 object JtagTapGenerator {
+  /** JTAG TAP generator, enclosed module must be clocked from TCK.
+    *
+    * @param irLength length, in bits, of instruction register, must be at least 2
+    * @param instructions map of data register chains to instruction codes that select that data
+    * register; instruction codes must be unique
+    * @param idcode optional idcode, tuple of (instruction code, idcode)
+    *
+    * @note all other instruction codes (not part of instructions or idcode) map to BYPASS
+    * @note initial instruction is idcode (if supported), otherwise all ones BYPASS
+    *
+    * Usage notes:
+    * - 4.3.1b TMS must appear high when undriven
+    * - 4.3.1c (rec) minimize load presented by TMS
+    * - 4.4.1b TDI must appear high when undriven
+    * - 4.5.1b TDO must be inactive except when shifting data (undriven? 6.1.2)
+    * - 6.1.3.1b TAP controller must not be (re-?)initialized by system reset (allows
+    *   boundary-scan testing of reset pin)
+    *   - 6.1 TAP controller can be initialized by a on-chip power on reset generator, the same one
+    *     that would initialize system logic
+    *
+    * TODO:
+    * - support concatenated scan chains
+    */
   def apply(irLength: Int, instructions: Map[Chain, Int], idcode:Option[(Int, Int)]=None): JtagTapController = {
-    val controllerInternal = Module(new JtagTapController(irLength, 0))
-
-    val bypassChain = Module(new JtagBypassChain)
-
+    // Create IDCODE chain if needed
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
-        val module = Module(new CaptureUpdateChain(32))
+        val module = Module(new CaptureUpdateChain(32))  // TODO: replace with just capture chain
         module.io.capture.bits := idcode.U(32.W)
         instructions + (module -> icode)
       }
       case None => instructions
     }
 
+    val requiredBypassInstruction = (1 << irLength) - 1
+    val initialInstruction = idcode match {  // 7.2.1e load IDCODE or BYPASS instruction after entry into TestLogicReset
+      case Some((icode, _)) => icode
+      case None => requiredBypassInstruction
+    }
+
+    val allICodes = allInstructions.valuesIterator.toSeq
+    require(!allICodes.contains(requiredBypassInstruction), "must not contain BYPASS code")
+
     // Ensure no duplicate instruction codes
     // from: https://stackoverflow.com/questions/24729544/how-to-find-duplicates-in-a-list
-    val allICodes = allInstructions.valuesIterator.toSeq
-    // TODO: ensure bypass code not in allIcodes
     val dupICodes = allICodes.groupBy(identity).  // map of iCode -> Seq(iCode) of all occurrences
       collect{ case (x,ys) if ys.lengthCompare(1) > 0 => x }
     require(dupICodes.size == 0, s"found duplicated instruction codes $dupICodes")
 
-    // Unused chain output
-    val unusedChainOut = Wire(new ShifterIO)
+    val controllerInternal = Module(new JtagTapController(irLength, initialInstruction))
+
+    val unusedChainOut = Wire(new ShifterIO)  // De-selected chain output
     unusedChainOut.shift := false.B
     unusedChainOut.data := false.B
     unusedChainOut.capture := false.B
     unusedChainOut.update := false.B
 
-    // The Great Data Reigster Chain Mux
+    val bypassChain = Module(new JtagBypassChain)
+
+    // The Great Data Register Chain Mux
     bypassChain.io.chainIn := controllerInternal.io.dataChainOut  // for simplicity, doesn't visible affect anything lse
     if (allInstructions.size == 0) {
       // Why anyone would need this (JTAG controller with no data registers) is beyond me.

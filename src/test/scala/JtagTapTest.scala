@@ -77,9 +77,8 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   val status = c.io.status
 
   tmsReset()
-
   // Test sequence in Figure 6-3 (instruction scan), starting with the half-cycle off-screen
-  expectInstruction(Some("00".b))
+  expectInstruction(Some("11".b))
   jtagCycle(1, JtagState.TestLogicReset)
   jtagCycle(0, JtagState.TestLogicReset)
   jtagCycle(1, JtagState.RunTestIdle)
@@ -107,6 +106,8 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   jtagCycle(0, JtagState.RunTestIdle)
   jtagCycle(0, JtagState.RunTestIdle)
   jtagCycle(0, JtagState.RunTestIdle)
+
+  tmsReset()
 }
 
 class JtagTapModule(irLength: Int) extends Module {
