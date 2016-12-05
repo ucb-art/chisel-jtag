@@ -67,6 +67,77 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     }
     expect(status.state, JtagState.TestLogicReset, "TMS reset: expected in reset state")
   }
+
+  def resetToIdle() {
+    tmsReset()
+    jtagCycle(0, JtagState.TestLogicReset)
+    expect(status.state, JtagState.RunTestIdle)
+  }
+
+  def idleToDRShift() {
+    jtagCycle(1, JtagState.RunTestIdle)
+    jtagCycle(0, JtagState.SelectDRScan)
+    jtagCycle(0, JtagState.CaptureDR)
+    expect(status.state, JtagState.ShiftDR)
+  }
+
+  def idleToIRShift() {
+    jtagCycle(1, JtagState.RunTestIdle)
+    jtagCycle(1, JtagState.SelectDRScan)
+    jtagCycle(0, JtagState.SelectIRScan)
+    jtagCycle(0, JtagState.CaptureIR)
+    expect(status.state, JtagState.ShiftIR)
+  }
+
+  def drShiftToIdle() {
+    jtagCycle(1, JtagState.Exit1DR)
+    jtagCycle(0, JtagState.UpdateDR)
+    expect(status.state, JtagState.RunTestIdle)
+  }
+
+  def irShiftToIdle() {
+    jtagCycle(1, JtagState.Exit1IR)
+    jtagCycle(0, JtagState.UpdateIR)
+    expect(status.state, JtagState.RunTestIdle)
+  }
+
+  /** Shifts data into the TDI register and checks TDO against expected data. Must start in the
+    * shift, and the TAP controller will be in the Exit1 state afterwards.
+    *
+    * TDI and expected TDO are specified as a string of 0 and 1. The strings are in time order,
+    * the first elements are the ones shifted out (and expected in) first. This is in waveform
+    * display order and LSB-first order (so when specifying a number in the usual MSB-first order,
+    * the string needs to be reversed).
+    */
+  def shift(tdi: String, expectedTdo: String, expectedState: JtagState.State, expectedNextState: JtagState.State) {
+    def charToTristate(x: Char): TristateValue = x match {
+      case '0' => 0
+      case '1' => 1
+      case '?' => X
+    }
+
+    val tdiBits = tdi map charToTristate
+    val expectedTdoBits = expectedTdo map charToTristate
+
+    require(tdi.size == expectedTdo.size)
+    val zipBits = tdiBits zip expectedTdoBits
+
+    for ((tdiBit, expectedTdoBit) <- zipBits.init) {
+      jtagCycle(0, expectedState, tdi=tdiBit, expectedTdo=expectedTdoBit)
+    }
+    val (tdiLastBit, expectedTdoLastBit) = zipBits.last
+    jtagCycle(1, expectedState, tdi=tdiLastBit, expectedTdo=expectedTdoLastBit)
+
+    expect(status.state, expectedNextState)
+  }
+
+  def drShift(tdi: String, expectedTdo: String) {
+    shift(tdi, expectedTdo, JtagState.ShiftDR, JtagState.Exit1DR)
+  }
+
+  def irShift(tdi: String, expectedTdo: String) {
+    shift(tdi, expectedTdo, JtagState.ShiftIR, JtagState.Exit1IR)
+  }
 }
 
 class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTestUtilities {
@@ -139,7 +210,10 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
   jtagCycle(1, JtagState.TestLogicReset)
 }
 
-class JtagTapModule(irLength: Int) extends Module {
+/** Test utility module that handles the multiclock generation for a JTAG test harness.
+  * @param tapGenerator a function that generates the JTAG tap
+  */
+class JtagTapModule(irLength: Int, tapGenerator: (Int)=>JtagTapController) extends Module {
   class ModIO extends Bundle {
     val jtag = new JtagIO
     val output = new JtagOutput(irLength)
@@ -149,7 +223,7 @@ class JtagTapModule(irLength: Int) extends Module {
   class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
     val io = IO(new ModIO)
 
-    val tap = JtagTapGenerator(irLength, Map())
+    val tap = tapGenerator(irLength)
     io.jtag <> tap.io.jtag
     io.output <> tap.io.output
     io.status <> tap.io.status
@@ -161,10 +235,14 @@ class JtagTapModule(irLength: Int) extends Module {
   io <> tap.io
 }
 
-class JtagTapSpec extends ChiselFlatSpec {
-  "JTAG TAP" should "work" in {
+class JtagTapExampleWaveformSpec extends ChiselFlatSpec {
+  "JTAG TAP with example waveforms from the spec" should "work" in {
+    def bareJtagGenerator(irLength: Int): JtagTapController = {
+      JtagTapGenerator(irLength, Map())
+    }
+
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => new JtagTapModule(2), backendType="verilator") {
+    Driver(() => new JtagTapModule(2, bareJtagGenerator), backendType="verilator") {
       c => new JtagTapTester(c)
     } should be (true)
   }

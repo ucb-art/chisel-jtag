@@ -144,6 +144,7 @@ object JtagTapGenerator {
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
         val module = Module(new CaptureUpdateChain(32))  // TODO: replace with just capture chain
+        require(idcode % 2 == 1, "LSB must be set in IDCODE, see 12.1.1d")
         module.io.capture.bits := idcode.U(32.W)
         instructions + (module -> icode)
       }
@@ -197,7 +198,7 @@ object JtagTapGenerator {
         }
       }
       allInstructions.toSeq.foldLeft(emptyWhen)(foldDef).otherwise {
-        controllerInternal.io.dataChainIn := bypassChain.io
+        controllerInternal.io.dataChainIn := bypassChain.io.chainOut
       }
     }
 
