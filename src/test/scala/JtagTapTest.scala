@@ -104,10 +104,10 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
   /** Shifts data into the TDI register and checks TDO against expected data. Must start in the
     * shift, and the TAP controller will be in the Exit1 state afterwards.
     *
-    * TDI and expected TDO are specified as a string of 0 and 1. The strings are in time order,
-    * the first elements are the ones shifted out (and expected in) first. This is in waveform
-    * display order and LSB-first order (so when specifying a number in the usual MSB-first order,
-    * the string needs to be reversed).
+    * TDI and expected TDO are specified as a string of 0, 1, and ?. Spaces are discarded.
+    * The strings are in time order, the first elements are the ones shifted out (and expected in)
+    * first. This is in waveform display order and LSB-first order (so when specifying a number in
+    * the usual MSB-first order, the string needs to be reversed).
     */
   def shift(tdi: String, expectedTdo: String, expectedState: JtagState.State, expectedNextState: JtagState.State) {
     def charToTristate(x: Char): TristateValue = x match {
@@ -116,10 +116,10 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
       case '?' => X
     }
 
-    val tdiBits = tdi map charToTristate
-    val expectedTdoBits = expectedTdo map charToTristate
+    val tdiBits = tdi.replaceAll(" ", "") map charToTristate
+    val expectedTdoBits = expectedTdo.replaceAll(" ", "") map charToTristate
 
-    require(tdi.size == expectedTdo.size)
+    require(tdiBits.size == expectedTdoBits.size)
     val zipBits = tdiBits zip expectedTdoBits
 
     for ((tdiBit, expectedTdoBit) <- zipBits.init) {
