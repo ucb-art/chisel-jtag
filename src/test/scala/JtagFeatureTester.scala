@@ -20,14 +20,14 @@ class JtagIdcodeTester(val c: JtagTapModule) extends PeekPokeTester(c) with Jtag
   irShiftToIdle()
 
   idleToDRShift()
-  drShift("00000000000000000000000000000000", "0010 0000000100100011 00001000010 1".reverse)
+  drShift("00000000000000000000000000000000", "1010 0000000100100011 00001000010 1".reverse)
   drShiftToIdle()
 }
 
 class JtagTapSpec extends ChiselFlatSpec {
   "JTAG TAP should output a proper IDCODE" should "work" in {
     def idcodeJtagGenerator(irLength: Int): JtagTapController = {
-      JtagTapGenerator(irLength, Map(), idcode=Some((0, JtagIdcode(0x2, 0x123, 0x42))))
+      JtagTapGenerator(irLength, Map(), idcode=Some((0, JtagIdcode(0xA, 0x123, 0x42))))
     }
 
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet

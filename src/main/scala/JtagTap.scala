@@ -46,7 +46,7 @@ class JtagBlockIO(irLength: Int) extends Bundle {
   * Misc notes:
   * - Figure 6-3 and 6-4 provides examples with timing behavior
   */
-class JtagTapController(irLength: Int, initialInstruction: Int) extends Module {
+class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Module {
   require(irLength >= 2)  // 7.1.1a
 
   val io = IO(new JtagBlockIO(irLength))
@@ -139,7 +139,7 @@ object JtagTapGenerator {
     * TODO:
     * - support concatenated scan chains
     */
-  def apply(irLength: Int, instructions: Map[Chain, Int], idcode:Option[(Int, Int)]=None): JtagTapController = {
+  def apply(irLength: Int, instructions: Map[Chain, BigInt], idcode:Option[(BigInt, BigInt)]=None): JtagTapController = {
     // Create IDCODE chain if needed
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
@@ -152,7 +152,7 @@ object JtagTapGenerator {
       case None => instructions
     }
 
-    val requiredBypassInstruction = (1 << irLength) - 1
+    val requiredBypassInstruction = (BigInt(1) << irLength) - 1
     val initialInstruction = idcode match {  // 7.2.1e load IDCODE or BYPASS instruction after entry into TestLogicReset
       case Some((icode, _)) => icode
       case None => requiredBypassInstruction
@@ -185,7 +185,7 @@ object JtagTapGenerator {
     } else {
       val emptyWhen = when (false.B) { }  // Empty WhenContext to start things off
 
-      def foldDef(res: WhenContext, x: (Chain, Int)): WhenContext = {
+      def foldDef(res: WhenContext, x: (Chain, BigInt)): WhenContext = {
         // Set chain input to controller when selected
         val selected = controllerInternal.io.output.instruction === x._2.U(irLength.W)
         when (selected) {
