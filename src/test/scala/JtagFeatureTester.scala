@@ -12,7 +12,6 @@ class JtagIdcodeTester(val c: JtagTapModule) extends PeekPokeTester(c) with Jtag
 
   val jtag = c.io.jtag
   val output = c.io.output
-  val status = c.io.status
 
   resetToIdle()
   idleToIRShift()

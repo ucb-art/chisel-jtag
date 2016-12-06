@@ -18,14 +18,8 @@ class JtagIO extends Bundle {
 /** JTAG block output signals.
   */
 class JtagOutput(irLength: Int) extends Bundle {
-  val instruction = Output(UInt(irLength.W))  // current active instruction
-}
-
-/** JTAG block internal status information, for testing purposes.
-  */
-class JtagStatus(irLength: Int) extends Bundle {
   val state = Output(JtagState.State.chiselType())  // state, transitions on TCK rising edge
-
+  val instruction = Output(UInt(irLength.W))  // current active instruction
 }
 
 /** Aggregate JTAG block IO.
@@ -35,7 +29,6 @@ class JtagBlockIO(irLength: Int) extends Bundle {
 
   val output = new JtagOutput(irLength)
 
-  val status = new JtagStatus(irLength)
   val dataChainOut = Output(new ShifterIO)
   val dataChainIn = Input(new ShifterIO)
 }
@@ -62,7 +55,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   val stateMachine = Module(new JtagStateMachine)
   stateMachine.io.tms := io.jtag.TMS
   val currState = stateMachine.io.currState
-  io.status.state := stateMachine.io.currState
+  io.output.state := stateMachine.io.currState
 
   //
   // Instruction Register

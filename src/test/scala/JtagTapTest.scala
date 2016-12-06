@@ -10,9 +10,8 @@ import jtag._
 trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTestUtility {
   val jtag: JtagIO
   val output: JtagOutput
-  val status: JtagStatus
 
-  var expectedInstruction: Option[Int] = None  // expected instruction (status.instruction) after TCK low
+  var expectedInstruction: Option[Int] = None  // expected instruction output after TCK low
 
   /** Convenience function for stepping a JTAG cycle (TCK high -> low -> high) and checking basic
     * JTAG values.
@@ -25,13 +24,13 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
   def jtagCycle(tms: Int, expectedState: JtagState.State, tdi: TristateValue = X,
       expectedTdo: TristateValue = Z, msg: String = "") {
     expect(jtag.TCK, 1, "TCK must start at 1")
-    val prevState = peek(status.state)
+    val prevState = peek(output.state)
 
-    expect(status.state, expectedState, s"$msg: expected state $expectedState")
+    expect(output.state, expectedState, s"$msg: expected state $expectedState")
 
     poke(jtag.TCK, 0)
     step(1)
-    expect(status.state, expectedState, s"$msg: expected state $expectedState")
+    expect(output.state, expectedState, s"$msg: expected state $expectedState")
 
     poke(jtag.TMS, tms)
     poke(jtag.TDI, tdi)
@@ -65,20 +64,20 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
       poke(jtag.TCK, 1)
       step(1)
     }
-    expect(status.state, JtagState.TestLogicReset, "TMS reset: expected in reset state")
+    expect(output.state, JtagState.TestLogicReset, "TMS reset: expected in reset state")
   }
 
   def resetToIdle() {
     tmsReset()
     jtagCycle(0, JtagState.TestLogicReset)
-    expect(status.state, JtagState.RunTestIdle)
+    expect(output.state, JtagState.RunTestIdle)
   }
 
   def idleToDRShift() {
     jtagCycle(1, JtagState.RunTestIdle)
     jtagCycle(0, JtagState.SelectDRScan)
     jtagCycle(0, JtagState.CaptureDR)
-    expect(status.state, JtagState.ShiftDR)
+    expect(output.state, JtagState.ShiftDR)
   }
 
   def idleToIRShift() {
@@ -86,19 +85,19 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     jtagCycle(1, JtagState.SelectDRScan)
     jtagCycle(0, JtagState.SelectIRScan)
     jtagCycle(0, JtagState.CaptureIR)
-    expect(status.state, JtagState.ShiftIR)
+    expect(output.state, JtagState.ShiftIR)
   }
 
   def drShiftToIdle() {
     jtagCycle(1, JtagState.Exit1DR)
     jtagCycle(0, JtagState.UpdateDR)
-    expect(status.state, JtagState.RunTestIdle)
+    expect(output.state, JtagState.RunTestIdle)
   }
 
   def irShiftToIdle() {
     jtagCycle(1, JtagState.Exit1IR)
     jtagCycle(0, JtagState.UpdateIR)
-    expect(status.state, JtagState.RunTestIdle)
+    expect(output.state, JtagState.RunTestIdle)
   }
 
   /** Shifts data into the TDI register and checks TDO against expected data. Must start in the
@@ -128,7 +127,7 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     val (tdiLastBit, expectedTdoLastBit) = zipBits.last
     jtagCycle(1, expectedState, tdi=tdiLastBit, expectedTdo=expectedTdoLastBit)
 
-    expect(status.state, expectedNextState)
+    expect(output.state, expectedNextState)
   }
 
   def drShift(tdi: String, expectedTdo: String) {
@@ -145,7 +144,6 @@ class JtagTapTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTes
 
   val jtag = c.io.jtag
   val output = c.io.output
-  val status = c.io.status
 
   tmsReset()
   expectInstruction(Some("11".b))
@@ -217,7 +215,6 @@ class JtagTapModule(irLength: Int, tapGenerator: (Int)=>JtagTapController) exten
   class ModIO extends Bundle {
     val jtag = new JtagIO
     val output = new JtagOutput(irLength)
-    val status = new JtagStatus(irLength)
   }
 
   class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
@@ -226,7 +223,6 @@ class JtagTapModule(irLength: Int, tapGenerator: (Int)=>JtagTapController) exten
     val tap = tapGenerator(irLength)
     io.jtag <> tap.io.jtag
     io.output <> tap.io.output
-    io.status <> tap.io.status
   }
 
   val io = IO(new ModIO)
