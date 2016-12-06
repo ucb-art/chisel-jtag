@@ -84,6 +84,7 @@ io.status <> tap.io.status
 ```
 
 ### Misc Notes
+
 - There's a lot of elaboration-time error checking to prevent parameters that are contrary to the spec. For example, the generator will `require` out if attempting to set an IDCODE that conflicts with the JTAG spec's reserved dummy code.
   - It is a bug if the generator can generate non-spec-compliant designs - if this happens, please file an issue!
   - Exception: boundary-scan is currently not implemented. Please don't file a bug for that.
