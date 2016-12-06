@@ -48,19 +48,20 @@ The arguments are:
 - `instructions`: Map[Chain, BigInt] - a Map of data registers (Chains) to the instruction code that selects them.
 - `idcode`: Option[(BigInt, BigInt)] - optional IDCODE generator. A value of None means to not generate a IDCODE register (and BYPASS, with an instruction code of all ones, will be selected as the initial instruction), while a value of (instruction code, idcode) generates the 32-bit IDCODE register and selects its corresponding instruction code as the initial instruction.
 
-All unused instruction codes will decode to BYPASS.
+All unused instruction codes will select the BYPASS register.
 
 ### User Data Chains
-`Chain` is the base trait for user data shift registers / scan chains. `Chain`s provide a `chainIn` and `chainOut` `ShifterIO`, consisting of the data bit into the chain and control signals (`capture` and `update`). The JTAG TAP controller exposes a chain output `ShifterIO` to be connected to the currently active data register `Chain`.
+`Chain` is the base trait for user data shift registers / scan chains. `Chain`s provide a `chainIn` and `chainOut` `ShifterIO`, consisting of the data bit into the chain and control signals (`capture` and `update`). The JTAG TAP controller exposes a chain output and input `ShifterIO` to be connected to the currently active data register `Chain`.
 - `capture` and `update` are high while in their corresponding JTAG states (one full TCK cycle). These status signals are always present in `ShifterIO` regardless of whether a chain supports capture and/or update.
+- The API design is to allow configurable concatenation of multiple chains, the details of this are still TBD.
 
 The current implemented `Chain`s are:
-- `JtagBypassChain()`: single stage bypass register with hard-coded zero on capture and no update. Users should not need to use this.
+- `JtagBypassChain()`: single stage bypass register with hard-coded zero on capture and no update. Users should not need to instantiate this, one is automatically provided by the generator.
 - `CaptureUpdateChain(n)`: a scan chain with parallel capture (load into shifter) and update (shifter valid).
   - `n`: number of bits (or stages in the shift register)
   - `CaptureUpdateChain` provides these IOs:
     - `capture`: a `CaptureIO` bundle, consisting of the parallel input `bits` and a `capture` Bool signal (which is a status indicator only). The parallel input should always be valid since `capture` may be asserted at any time.
-    - `update`: a `ValidIO` bundle, consisting of the parallel output `bits` and a `valid` Bool signal (which is high for only one TCK cycle, in the JTAG Update-* state). Note that `bits` output is only _guaranteed_ valid when `valid` is high. This may be fed (for example) into a (clock-crossing) FIFO or into a register which updates on `valid`.
+    - `update`: a `ValidIO` bundle, consisting of the parallel output `bits` and a `valid` Bool signal (which is high for only one TCK cycle, in the JTAG Update-* state). Note that `bits` output is _only+ guaranteed valid when `valid` is high. This may be fed (for example) into a (clock-crossing) FIFO or a register which updates on `valid`.
 
 Example usage with TAP generator invocation:
 
@@ -75,8 +76,8 @@ when (myDataChain.io.update.valid) {
   myFunRegister := myDataChain.io.update.bits  // latch system register with scanned-in data
 }
 
-// Generate a JTAG TAP with a 2-bit IR and select myDataChain for scan when instruction code b01
-// is active. BYPASS chain is selected for all other instruction codes.
+// Generate a JTAG TAP with a 2-bit IR and select myDataChain for scan when instruction code b01 is
+// active. Don't generate an IDCODE chain. BYPASS chain is selected for all other instruction codes.
 val tap = JtagTapGenerator(2, Map(myDataChain -> 1))
 io.jtag <> tap.io.jtag
 io.output <> tap.io.output
@@ -91,9 +92,10 @@ io.status <> tap.io.status
 
 ## Hardware Verification
 This generator has been used in these designs:
+- None yet.
 
-### iCE40 Breakout
-Planned, to be done,
+Planned:
+- ICE40HX8K-B-EVN (Lattice iCE40 FPGA)
 
 ## TODOs
 Some features are yet to be implemented:
@@ -105,7 +107,7 @@ Some features are yet to be implemented:
 
 Some features need a bit more thought:
 - Arbiters / arbiter generators so a data chain can act as a low priority (relative to the system) bus master. Possibly also a FIRRTL transform to hook up such an arbiter to an existing system bus.
-- Data chains with always-valid data output and glitchless updates, allowing the output to be used as a register. Possible also a FIRRTL transform to replace a system register with such a register.
+- Data chains with always-valid data output and glitchless updates, allowing the output to be used as a register. Possibly also a FIRRTL transform to replace a system register with such a register.
 
 Some cleaning up is also to be done:
 - Multiclock using chisel3's proposed `withClock` API, when it's done.
