@@ -76,9 +76,8 @@ class JtagStateMachine extends Module {
   // end), but theoretically allows a cleaner capture.
   val tms = Reg(Bool(), next=io.tms)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
 
-  val lastState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U)
   val nextState = Wire(JtagState.State.chiselType())
-  lastState := nextState
+  val lastState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U, next=nextState)
   io.currState := nextState
 
   switch (lastState) {

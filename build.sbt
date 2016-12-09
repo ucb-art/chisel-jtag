@@ -1,4 +1,4 @@
-name := "builtin-debugger"
+name := "chisel-jtag"
 
 version := "0"
 
