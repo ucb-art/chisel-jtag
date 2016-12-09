@@ -27,7 +27,7 @@ class top extends Module {
   }
 
   val io = IO(new ModIO)
-  val irLength = 4
+  val irLength = 8
 
   class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
     val io = IO(new ClockedBlockIO(irLength))
@@ -39,6 +39,11 @@ class top extends Module {
 
   // Support for multiple internally-chained JTAG TAPs
   val taps = List(
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock))
@@ -65,12 +70,9 @@ class top extends Module {
   for (i <- 0 until 8) {
     io.out(i) := false.B
   }
-
-  // Inexplicably necessary, otherwise synthesis breaks
-  io.out1(0) := taps(0).io.output.state(0)
-  io.out1(1) := taps(1).io.output.state(1)
-  io.out1(2) := taps(2).io.output.state(3)
-
+  for (i <- 0 until 3) {
+    io.out1(i) := false.B
+  }
   for (i <- 0 until 3) {
     io.out2(i) := count.io.count(i)
   }
