@@ -7,7 +7,7 @@ import Chisel.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
 import chisel3._
 import jtag._
 
-class JtagIdcodeTester(val c: JtagTapModule) extends PeekPokeTester(c) with JtagTestUtilities {
+class JtagIdcodeTester(val c: Module{val io: JtagBlockIO}) extends PeekPokeTester(c) with JtagTestUtilities {
   import BinaryParse._
 
   val jtag = c.io.jtag
@@ -23,14 +23,17 @@ class JtagIdcodeTester(val c: JtagTapModule) extends PeekPokeTester(c) with Jtag
   drShiftToIdle()
 }
 
+class JtagIdcodeModule(irLength: Int, idcode: (BigInt, BigInt)) extends Module {
+  val controller = JtagTapGenerator(irLength, Map(), idcode=Some(idcode))
+  val io = IO(new JtagBlockIO(irLength)) //controller.io.cloneType
+  io.jtag <> controller.io.jtag
+  io.output := controller.io.output
+}
+
 class JtagTapSpec extends ChiselFlatSpec {
   "JTAG TAP should output a proper IDCODE" should "work" in {
-    def idcodeJtagGenerator(irLength: Int): JtagTapController = {
-      JtagTapGenerator(irLength, Map(), idcode=Some((0, JtagIdcode(0xA, 0x123, 0x42))))
-    }
-
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => new JtagTapModule(2, idcodeJtagGenerator), backendType="verilator") {
+    Driver(() => JtagReclocked(() => new JtagIdcodeModule(2, (0, JtagIdcode(0xA, 0x123, 0x42)))), backendType="verilator") {
       c => new JtagIdcodeTester(c)
     } should be (true)
   }

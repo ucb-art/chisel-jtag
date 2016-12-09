@@ -20,17 +20,26 @@ class JtagIO extends Bundle {
 class JtagOutput(irLength: Int) extends Bundle {
   val state = Output(JtagState.State.chiselType())  // state, transitions on TCK rising edge
   val instruction = Output(UInt(irLength.W))  // current active instruction
+
+  override def cloneType = new JtagOutput(irLength).asInstanceOf[this.type]
 }
 
 /** Aggregate JTAG block IO.
   */
 class JtagBlockIO(irLength: Int) extends Bundle {
   val jtag = new JtagIO
-
   val output = new JtagOutput(irLength)
 
+  override def cloneType = new JtagBlockIO(irLength).asInstanceOf[this.type]
+}
+
+/** Internal controller block IO with data shift outputs.
+  */
+class JtagControllerIO(irLength: Int) extends JtagBlockIO(irLength) {
   val dataChainOut = Output(new ShifterIO)
   val dataChainIn = Input(new ShifterIO)
+
+  override def cloneType = new JtagControllerIO(irLength).asInstanceOf[this.type]
 }
 
 /** JTAG TAP controller internal block, responsible for instruction decode and data register chain
@@ -42,7 +51,7 @@ class JtagBlockIO(irLength: Int) extends Bundle {
 class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Module {
   require(irLength >= 2)  // 7.1.1a
 
-  val io = IO(new JtagBlockIO(irLength))
+  val io = IO(new JtagControllerIO(irLength))
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
   val tdo_driven = Wire(Bool())
