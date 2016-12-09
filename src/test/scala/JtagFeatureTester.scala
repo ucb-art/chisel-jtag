@@ -22,9 +22,8 @@ class JtagIdcodeTester(val c: JtagClocked[JtagIdcodeModule]) extends JtagTester(
 
 class JtagIdcodeModule(irLength: Int, idcode: (BigInt, BigInt)) extends JtagModule {
   val controller = JtagTapGenerator(irLength, Map(), idcode=Some(idcode))
-  val io = IO(new JtagBlockIO(irLength)) //controller.io.cloneType
-  io.jtag <> controller.io.jtag
-  io.output := controller.io.output
+  val io = IO(controller.cloneType)
+  io <> controller
 }
 
 class JtagRegisterTester(val c: JtagClocked[JtagRegisterModule]) extends JtagTester(c) {
@@ -40,9 +39,8 @@ class JtagRegisterTester(val c: JtagClocked[JtagRegisterModule]) extends JtagTes
 
 class JtagRegisterModule() extends JtagModule {
   val controller = JtagTapGenerator(2, Map())
-  val io = IO(new JtagBlockIO(2)) //controller.io.cloneType
-  io.jtag <> controller.io.jtag
-  io.output := controller.io.output
+  val io = IO(controller.cloneType)
+  io <> controller
 }
 
 class JtagTapSpec extends ChiselFlatSpec {

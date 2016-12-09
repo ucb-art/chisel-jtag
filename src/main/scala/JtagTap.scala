@@ -141,7 +141,7 @@ object JtagTapGenerator {
     * TODO:
     * - support concatenated scan chains
     */
-  def apply(irLength: Int, instructions: Map[Chain, BigInt], idcode:Option[(BigInt, BigInt)]=None): JtagTapController = {
+  def apply(irLength: Int, instructions: Map[Chain, BigInt], idcode:Option[(BigInt, BigInt)]=None): JtagBlockIO = {
     // Create IDCODE chain if needed
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
@@ -205,6 +205,11 @@ object JtagTapGenerator {
       }
     }
 
-    controllerInternal
+    val internalIo = Wire(new JtagBlockIO(irLength))
+
+    controllerInternal.io.jtag <> internalIo.jtag
+    controllerInternal.io.output <> internalIo.output
+
+    internalIo
   }
 }

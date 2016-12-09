@@ -30,11 +30,9 @@ class top extends Module {
   val irLength = 8
 
   class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
-    val io = IO(new ClockedBlockIO(irLength))
-
-    val tap = JtagTapGenerator(irLength, Map(), idcode=Some((1, JtagIdcode(0xA, 0x123, 0x42))))
-    io.jtag <> tap.io.jtag
-    io.output <> tap.io.output
+    val tapIo = JtagTapGenerator(irLength, Map(), idcode=Some((1, JtagIdcode(0xA, 0x123, 0x42))))
+    val io = IO(tapIo.cloneType)
+    io <> tapIo
   }
 
   // Support for multiple internally-chained JTAG TAPs

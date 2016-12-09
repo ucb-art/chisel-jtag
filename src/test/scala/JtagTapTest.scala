@@ -237,9 +237,8 @@ object JtagClocked {
 
 class BareJtagModule(irLength: Int) extends JtagModule {
   val controller = JtagTapGenerator(irLength, Map())
-  val io = IO(new JtagBlockIO(irLength)) //controller.io.cloneType
-  io.jtag <> controller.io.jtag
-  io.output := controller.io.output
+  val io = IO(controller.cloneType)
+  io <> controller
 }
 
 class JtagTapExampleWaveformSpec extends ChiselFlatSpec {
