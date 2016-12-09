@@ -18,13 +18,16 @@ class top extends Module {
 
   class ModIO extends Bundle {
     val jtag = new JtagIO
+
     val out = Output(Vec(8, Bool()))
     val out1 = Output(Vec(3, Bool()))
+    val out2 = Output(Vec(3, Bool()))
+
     val state = Output(Vec(4, Bool()))
   }
 
   val io = IO(new ModIO)
-  val irLength = 2
+  val irLength = 4
 
   class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
     val io = IO(new ClockedBlockIO(irLength))
@@ -32,15 +35,25 @@ class top extends Module {
     val tap = JtagTapGenerator(irLength, Map(), idcode=Some((1, JtagIdcode(0xA, 0x123, 0x42))))
     io.jtag <> tap.io.jtag
     io.output <> tap.io.output
-
-    io.status(0) := Reg(next=tap.io.output.state === JtagState.TestLogicReset.U)
-    io.status(1) := Reg(next=io.jtag.TMS)
-    io.status(2) := Reg(next=tap.io.jtag.TDO.driven)
   }
-  val tap = Module(new JtagTapClocked(io.jtag.TCK.asClock))
-  io.jtag <> tap.io.jtag
-  io.out1 <> tap.io.status
 
+  // Support for multiple internally-chained JTAG TAPs
+  val taps = List(
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
+      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
+      Module(new JtagTapClocked(io.jtag.TCK.asClock))
+  )
+  for (tap <- taps) {
+    tap.io.jtag.TCK := io.jtag.TCK
+    tap.io.jtag.TMS := io.jtag.TMS
+  }
+  taps.head.io.jtag.TDI := io.jtag.TDI
+  for (prev :: next :: Nil <- taps sliding 2) {
+    next.io.jtag.TDI := prev.io.jtag.TDO.data
+  }
+  io.jtag.TDO := taps.last.io.jtag.TDO
+
+  // Debug indicator (count cycles using the line itself as a register clock)
   class CounterClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
     val io = IO(new CountIO)
 
@@ -50,12 +63,17 @@ class top extends Module {
   val count = Module(new CounterClocked(io.jtag.TCK.asClock))
 
   for (i <- 0 until 8) {
-    io.out(i) := count.io.count(i)
+    io.out(i) := false.B
   }
-//  io.state(0) := tap.io.output.state(0)
-//  for (i <- 0 until 4) {
-//    io.state(i) := tap.io.output.state(i)
-//  }
+
+  // Inexplicably necessary, otherwise synthesis breaks
+  io.out1(0) := taps(0).io.output.state(0)
+  io.out1(1) := taps(1).io.output.state(0)
+  io.out1(2) := taps(2).io.output.state(0)
+
+  for (i <- 0 until 3) {
+    io.out2(i) := count.io.count(i)
+  }
 }
 
 object Top {

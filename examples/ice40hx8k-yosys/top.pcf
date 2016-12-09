@@ -11,6 +11,10 @@ set_io io_out1_0 J15
 set_io io_out1_1 G14
 set_io io_out1_2 K14
 
+set_io io_out2_0 K15
+set_io io_out2_1 M16
+set_io io_out2_2 N16
+
 set_io io_jtag_TCK C16
 set_io io_jtag_TMS D16
 set_io io_jtag_TDI E16
