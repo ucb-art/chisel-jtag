@@ -68,8 +68,8 @@ class top extends Module {
 
   // Inexplicably necessary, otherwise synthesis breaks
   io.out1(0) := taps(0).io.output.state(0)
-  io.out1(1) := taps(1).io.output.state(0)
-  io.out1(2) := taps(2).io.output.state(0)
+  io.out1(1) := taps(1).io.output.state(1)
+  io.out1(2) := taps(2).io.output.state(3)
 
   for (i <- 0 until 3) {
     io.out2(i) := count.io.count(i)
