@@ -5,6 +5,7 @@ package jtag.test
 import Chisel.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
 
 import chisel3._
+import chisel3.util._
 import jtag._
 
 class NegativeEdgeLatchBoolTest(val c: NegativeEdgeLatchTestModule[Bool]) extends PeekPokeTester(c) {
@@ -98,6 +99,111 @@ class NegativeEdgeLatchSpec extends ChiselFlatSpec {
   "NegativeEdgeLatch with a UInt" should "work" in {
     Driver(() => new NegativeEdgeLatchTestModule(UInt(2.W)), backendType="verilator") {
       c => new NegativeEdgeLatchUIntTest(c)
+    } should be (true)
+  }
+}
+
+class ClockedCounter4Test(val c: ClockedCounterTestModule) extends PeekPokeTester(c) {
+  // Reset to known state
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 0)
+
+  // Simple transition
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 1)
+
+  // Main clock runs without counter transitioning
+  step(1)
+  expect(c.io.out, 1)
+  step(1)
+  expect(c.io.out, 1)
+
+  // No counting on falling edge
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 1)
+
+  // More transitions and overflow test
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 2)
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 2)
+
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 3)
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 3)
+
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 0)
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 0)
+}
+
+class ClockedCounter3Test(val c: ClockedCounterTestModule) extends PeekPokeTester(c) {
+  // Reset to known state
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 0)
+
+  // Simple transition
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 1)
+
+  // Main clock runs without counter transitioning
+  step(1)
+  expect(c.io.out, 1)
+  step(1)
+  expect(c.io.out, 1)
+
+  // No counting on falling edge
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 1)
+
+  // More transitions and overflow test
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 2)
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 2)
+
+  poke(c.io.in, true)
+  step(1)
+  expect(c.io.out, 0)
+  poke(c.io.in, false)
+  step(1)
+  expect(c.io.out, 0)
+}
+
+class ClockedCounterTestModule(counts: Int) extends Module {
+  class ModIO extends Bundle {
+    val in = Input(Bool())
+    val out = Output(UInt(log2Up(counts).W))
+  }
+  val io = IO(new ModIO)
+  io.out := ClockedCounter(io.in, counts, 0)
+}
+
+class ClockedCounterSpec extends ChiselFlatSpec {
+  "ClockedCounter with 4 counts" should "work" in {
+    Driver(() => new ClockedCounterTestModule(4), backendType="verilator") {
+      c => new ClockedCounter4Test(c)
+    } should be (true)
+  }
+  "ClockedCounter with 3 counts" should "work" in {
+    Driver(() => new ClockedCounterTestModule(3), backendType="verilator") {
+      c => new ClockedCounter3Test(c)
     } should be (true)
   }
 }

@@ -42,10 +42,6 @@ class top extends Module {
       Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock)),
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock))
   )
   for (tap <- taps) {
@@ -58,23 +54,16 @@ class top extends Module {
   }
   io.jtag.TDO := taps.last.io.jtag.TDO
 
-  // Debug indicator (count cycles using the line itself as a register clock)
-  class CounterClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
-    val io = IO(new CountIO)
-
-    val (cnt, wrap) = Counter(true.B, (1 << 30))
-    io.count := cnt
-  }
-  val count = Module(new CounterClocked(io.jtag.TCK.asClock))
-
   for (i <- 0 until 8) {
     io.out(i) := false.B
   }
   for (i <- 0 until 3) {
     io.out1(i) := false.B
   }
+
+  val count = ClockedCounter(io.jtag.TCK, 2 ^ 16, 0)  // clock crossing debug counter
   for (i <- 0 until 3) {
-    io.out2(i) := count.io.count(i)
+    io.out2(i) := count(i)
   }
 }
 
