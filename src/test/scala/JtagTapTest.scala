@@ -139,11 +139,13 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
   }
 }
 
-class JtagTapTester(val c: Module{val io: JtagBlockIO}) extends PeekPokeTester(c) with JtagTestUtilities {
-  import BinaryParse._
-
+class JtagTester[T <: JtagModule](c: JtagClocked[T]) extends PeekPokeTester(c) with JtagTestUtilities {
   val jtag = c.io.jtag
   val output = c.io.output
+}
+
+class JtagTapTester(val c: JtagClocked[BareJtagModule]) extends JtagTester(c) {
+  import BinaryParse._
 
   tmsReset()
   expectInstruction(Some("11".b))
@@ -208,7 +210,11 @@ class JtagTapTester(val c: Module{val io: JtagBlockIO}) extends PeekPokeTester(c
   jtagCycle(1, JtagState.TestLogicReset)
 }
 
-class JtagReclockedModule[B <: JtagBlockIO](gen: ()=>Module{val io: B}) extends Module {
+trait JtagModule extends Module {
+  val io: JtagBlockIO
+}
+
+class JtagClocked[T <: JtagModule](gen: ()=>T) extends Module {
   class Reclocked(modClock: Clock) extends Module(override_clock=Some(modClock)) {
     val mod = Module(gen())
     val io = IO(mod.io.cloneType)
@@ -218,18 +224,18 @@ class JtagReclockedModule[B <: JtagBlockIO](gen: ()=>Module{val io: B}) extends 
   val innerClock = Wire(Bool())
   val clockMod = Module(new Reclocked(innerClock.asClock))
 
-  val io: B = IO(clockMod.io.cloneType)
+  val io = IO(clockMod.io.cloneType)
   io <> clockMod.io
   innerClock := io.jtag.TCK
 }
 
-object JtagReclocked {
-  def apply[B <: JtagBlockIO](gen: ()=>Module{val io: B}): Module{val io: B} = {
-    new JtagReclockedModule(gen)
+object JtagClocked {
+  def apply[T <: JtagModule](gen: ()=>T): JtagClocked[T] = {
+    new JtagClocked(gen)
   }
 }
 
-class BareJtagModule(irLength: Int) extends Module {
+class BareJtagModule(irLength: Int) extends JtagModule {
   val controller = JtagTapGenerator(irLength, Map())
   val io = IO(new JtagBlockIO(irLength)) //controller.io.cloneType
   io.jtag <> controller.io.jtag
@@ -239,7 +245,7 @@ class BareJtagModule(irLength: Int) extends Module {
 class JtagTapExampleWaveformSpec extends ChiselFlatSpec {
   "JTAG TAP with example waveforms from the spec" should "work" in {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => JtagReclocked(() => new BareJtagModule(2)), backendType="verilator") {
+    Driver(() => JtagClocked(() => new BareJtagModule(2)), backendType="verilator") {
       c => new JtagTapTester(c)
     } should be (true)
   }
