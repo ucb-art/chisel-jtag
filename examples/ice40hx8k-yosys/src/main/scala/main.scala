@@ -22,8 +22,6 @@ class top extends Module {
     val out = Output(Vec(8, Bool()))
     val out1 = Output(Vec(3, Bool()))
     val out2 = Output(Vec(3, Bool()))
-
-    val state = Output(Vec(4, Bool()))
   }
 
   val io = IO(new ModIO)
