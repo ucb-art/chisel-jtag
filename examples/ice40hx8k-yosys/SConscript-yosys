@@ -2,13 +2,13 @@ Import('env')
 
 env.SetDefault(YOSYS = 'yosys')
 env.SetDefault(YOSYS_CMD = '')
-env.SetDefault(SYNTHCOM = 'yosys -p "$YOSYS_CMD" $SOURCE > /dev/null')
+env.SetDefault(SYNTHCOM = 'yosys -p "$YOSYS_CMD" $SOURCE -q')
 env.SetDefault(SYNTHCOMSTR = '$SYNTH')
 
 env.SetDefault(ARACHNE = 'arachne-pnr')
 # See http://www.clifford.at/icestorm/ for target specifications
 env.SetDefault(PLACEROUTEOPTS = '')
-env.SetDefault(PLACEROUTECOM = '$ARACHNE $PLACEROUTEOPTS $SOURCE -o $TARGET 2> /dev/null')
+env.SetDefault(PLACEROUTECOM = '$ARACHNE -q $PLACEROUTEOPTS $SOURCE -o $TARGET')
 env.SetDefault(PLACEROUTECOMSTR = '$PLACEROUTE')
 
 env.SetDefault(ICEPACK = 'icepack')
