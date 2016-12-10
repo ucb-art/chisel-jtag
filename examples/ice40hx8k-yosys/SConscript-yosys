@@ -1,0 +1,63 @@
+Import('env')
+
+env.SetDefault(YOSYS = 'yosys')
+env.SetDefault(YOSYS_CMD = '')
+env.SetDefault(SYNTHCOM = 'yosys -p "$YOSYS_CMD" $SOURCE > /dev/null')
+env.SetDefault(SYNTHCOMSTR = '$SYNTH')
+
+env.SetDefault(ARACHNE = 'arachne-pnr')
+env.SetDefault(PLACEROUTEOPTS = '')
+env.SetDefault(PLACEROUTECOM = '$ARACHNE $PLACEROUTEOPTS $SOURCE -o $TARGET 2> /dev/null')
+env.SetDefault(PLACEROUTECOMSTR = '$PLACEROUTE')
+
+env.SetDefault(ICEPACK = 'icepack')
+env.SetDefault(BITGENCOM = '$ICEPACK $SOURCE $TARGET > /dev/null')
+env.SetDefault(BITGENCOMSTR = '$BITGEN')
+
+env.SetDefault(ICEPROG = 'iceprog')
+env.SetDefault(BITPROGCOM = '$ICEPROG $SOURCE')
+env.SetDefault(BITPROGCOMSTR = '$BITPROG')
+
+env.Append(BUILDERS = {'Synthesize': Builder(
+  action=Action('$SYNTHCOM', '$SYNTHCOMSTR'),
+  src_suffix='.v',
+  suffix='.blif'
+)})
+
+env.Append(BUILDERS = {'_PlaceRoute': Builder(
+  action=Action('$PLACEROUTECOM', '$PLACEROUTECOMSTR'),
+  src_suffix='.blif',
+  suffix='.asc'
+)})
+
+def PlaceRoute(env, *args, **kwargs):
+  if 'pcf' in kwargs:
+    pcf = kwargs['pcf']
+    del kwargs['pcf']
+  else:
+    pcf = None
+
+  if pcf is not None:
+    env = env.Clone(
+      PCFFILE=pcf,
+      PLACEROUTEOPTS=env['PLACEROUTEOPTS'] + ' -p $PCFFILE'
+    )
+  target = env._PlaceRoute(*args)
+  if pcf is not None:
+    Depends(target, pcf)
+  return target
+
+env.AddMethod(PlaceRoute)
+
+env.Append(BUILDERS = {'BitGen': Builder(
+  action=Action('$BITGENCOM', '$BITGENCOMSTR'),
+  src_suffix='.asc',
+  suffix='.bin'
+)})
+
+env.Append(BUILDERS = {'BitProg': Builder(
+  action=Action('$BITPROGCOM', '$BITPROGCOMSTR'),
+  src_suffix='.bin'
+)})
+
+

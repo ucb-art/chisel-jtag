@@ -47,7 +47,7 @@ class top extends Module {
     tap.io.jtag.TMS := io.jtag.TMS
   }
   taps.head.io.jtag.TDI := io.jtag.TDI
-  for (prev :: next :: Nil <- taps sliding 2) {
+  for (List(prev, next) <- taps sliding 2) {
     next.io.jtag.TDI := prev.io.jtag.TDO.data
   }
   io.jtag.TDO := taps.last.io.jtag.TDO
@@ -59,7 +59,7 @@ class top extends Module {
     io.out1(i) := false.B
   }
 
-  val count = ClockedCounter(io.jtag.TCK, 2 ^ 16, 0)  // clock crossing debug counter
+  val count = ClockedCounter(io.jtag.TCK, 2 ^ 8, 0)  // clock crossing debug counter
   for (i <- 0 until 3) {
     io.out2(i) := count(i)
   }

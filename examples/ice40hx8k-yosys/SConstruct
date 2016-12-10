@@ -1,0 +1,37 @@
+# Top-level build wrapper so build outputs go in a separate directory.
+import multiprocessing
+import os
+import os.path
+
+SetOption('num_jobs', multiprocessing.cpu_count() + 1)
+env = Environment(ENV=os.environ)
+
+Export('env')
+
+def simplify_output(env, mappings):
+  pad_len = max([len(val) for val in mappings.values()]) + 2
+  for key, val in mappings.items():
+    env[key] = val + (' ' * (pad_len - len(val))) + '$TARGET'
+
+if ARGUMENTS.get('VERBOSE') != '1':
+  simplify_output(env, {
+    'SYNTHCOMSTR': 'SYN',
+    'PLACEROUTECOMSTR': 'PNR',
+    'BITGENCOMSTR': 'BIT',
+    'BITPROGCOMSTR': 'PROG',
+  })
+
+###
+### Imports
+###
+SConscript('SConscript-yosys', duplicate=0)
+
+### Target Configuration
+env['PLACEROUTEOPTS'] = '-d 8k -P ct256'  # iCE40HX8K-B-EVN breakout board
+# env['YOSYS_CMD'] = 'synth_ice40 -blif $TARGET'  # broken, re-encoding messes up JTAG FSM
+env['YOSYS_CMD'] = 'synth_ice40 -run :coarse -blif $TARGET; synth -run coarse -nofsm; synth_ice40 -run bram: -blif $TARGET'
+
+###
+### Actual build targets here
+###
+SConscript('SConscript', variant_dir='build', duplicate=0)
