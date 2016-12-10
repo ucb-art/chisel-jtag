@@ -70,7 +70,7 @@ class JtagRegisterModule() extends JtagModule {
 
   val reg = Reg(UInt(8.W), init=42.U)
 
-  val chain = Module(new CaptureUpdateChain(8))  // TODO: replace with just capture chain
+  val chain = Module(new CaptureUpdateChain(8))
   chain.io.capture.bits := reg
   when (chain.io.update.valid) {
     reg := chain.io.update.bits
@@ -86,12 +86,12 @@ class JtagRegisterModule() extends JtagModule {
 }
 
 class JtagTapSpec extends ChiselFlatSpec {
-//  "JTAG TAP should output a proper IDCODE" should "work" in {
-//    //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-//    Driver(() => JtagClocked(() => new JtagIdcodeModule(2, (0, JtagIdcode(0xA, 0x123, 0x42)))), backendType="verilator") {
-//      c => new JtagIdcodeTester(c)
-//    } should be (true)
-//  }
+  "JTAG TAP should output a proper IDCODE" should "work" in {
+    //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
+    Driver(() => JtagClocked(() => new JtagIdcodeModule(2, (0, JtagIdcode(0xA, 0x123, 0x42)))), backendType="verilator") {
+      c => new JtagIdcodeTester(c)
+    } should be (true)
+  }
   "JTAG data registers" should "capture and update" in {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
     Driver(() => JtagClocked(() => new JtagRegisterModule()), backendType="verilator") {

@@ -1,11 +1,11 @@
-set_io io_out_0 B5
-set_io io_out_1 B4
-set_io io_out_2 A2
-set_io io_out_3 A1
-set_io io_out_4 C5
-set_io io_out_5 C4
-set_io io_out_6 B3
-set_io io_out_7 C3
+set_io io_out0_0 B5
+set_io io_out0_1 B4
+set_io io_out0_2 A2
+set_io io_out0_3 A1
+set_io io_out0_4 C5
+set_io io_out0_5 C4
+set_io io_out0_6 B3
+set_io io_out0_7 C3
 
 set_io io_out1_0 J15
 set_io io_out1_1 G14
