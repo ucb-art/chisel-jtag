@@ -50,6 +50,7 @@ trait TristateTestUtility extends PeekPokeTester[chisel3.Module] {
       case Z => {
         expect(node.driven, 0, s"$msg: expected tristate driven=0")
       }
+      case X =>
     }
   }
 
