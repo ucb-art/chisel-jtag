@@ -3,7 +3,8 @@ Import('env')
 blif = env.Synthesize('top', 'build/top.v')
 asc = env.PlaceRoute(blif, pcf='top.pcf')
 bits = env.BitGen(asc)
+report = env.Timing(asc)
 
-env.Default(bits)
+env.Default(bits, report)
 
-env.Alias('prog', env.BitProg(bits))
+env.Alias('prog', [env.BitProg(bits), report])

@@ -37,9 +37,6 @@ class top extends Module {
 
   // Support for multiple internally-chained JTAG TAPs
   val taps = List(
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
-      Module(new JtagTapClocked(io.jtag.TCK.asClock)),
       Module(new JtagTapClocked(io.jtag.TCK.asClock))
   )
   for (tap <- taps) {

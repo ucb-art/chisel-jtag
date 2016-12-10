@@ -19,6 +19,7 @@ if ARGUMENTS.get('VERBOSE') != '1':
     'PLACEROUTECOMSTR': 'PNR',
     'BITGENCOMSTR': 'BIT',
     'BITPROGCOMSTR': 'PROG',
+    'TIMINGCOMSTR': 'TIME',
   })
 
 ###
@@ -28,6 +29,8 @@ SConscript('SConscript-yosys', duplicate=0)
 
 ### Target Configuration
 env['PLACEROUTEOPTS'] = '-d 8k -P ct256'  # iCE40HX8K-B-EVN breakout board
+env['TIMINGOPTS'] = '-tmd hx8k'
+env['BITPROGOPTS'] = '-S'  # SRAM programming is faster
 # env['YOSYS_CMD'] = 'synth_ice40 -blif $TARGET'  # broken, re-encoding messes up JTAG FSM
 env['YOSYS_CMD'] = 'synth_ice40 -run :coarse -blif $TARGET; synth -run coarse -nofsm; synth_ice40 -run bram: -blif $TARGET'
 

@@ -6,6 +6,7 @@ env.SetDefault(SYNTHCOM = 'yosys -p "$YOSYS_CMD" $SOURCE > /dev/null')
 env.SetDefault(SYNTHCOMSTR = '$SYNTH')
 
 env.SetDefault(ARACHNE = 'arachne-pnr')
+# See http://www.clifford.at/icestorm/ for target specifications
 env.SetDefault(PLACEROUTEOPTS = '')
 env.SetDefault(PLACEROUTECOM = '$ARACHNE $PLACEROUTEOPTS $SOURCE -o $TARGET 2> /dev/null')
 env.SetDefault(PLACEROUTECOMSTR = '$PLACEROUTE')
@@ -15,8 +16,14 @@ env.SetDefault(BITGENCOM = '$ICEPACK $SOURCE $TARGET > /dev/null')
 env.SetDefault(BITGENCOMSTR = '$BITGEN')
 
 env.SetDefault(ICEPROG = 'iceprog')
-env.SetDefault(BITPROGCOM = '$ICEPROG $SOURCE')
+env.SetDefault(BITPROGOPTS = '')
+env.SetDefault(BITPROGCOM = '$ICEPROG $BITPROGOPTS $SOURCE 2> /dev/null')
 env.SetDefault(BITPROGCOMSTR = '$BITPROG')
+
+env.SetDefault(ICETIME = 'icetime')
+env.SetDefault(TIMINGOPTS = '')
+env.SetDefault(TIMINGCOM = '$ICETIME $TIMINGOPTS $SOURCE > $TARGET')
+env.SetDefault(TIMINGCOMSTR = '$TIMINGCOM')
 
 env.Append(BUILDERS = {'Synthesize': Builder(
   action=Action('$SYNTHCOM', '$SYNTHCOMSTR'),
@@ -60,4 +67,8 @@ env.Append(BUILDERS = {'BitProg': Builder(
   src_suffix='.bin'
 )})
 
-
+env.Append(BUILDERS = {'Timing': Builder(
+  action=Action('$TIMINGCOM', '$TIMINGCOMSTR'),
+  suffix='.rpt',
+  src_suffix='.asc'
+)})
