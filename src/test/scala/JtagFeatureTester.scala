@@ -29,15 +29,6 @@ class JtagIdcodeModule(irLength: Int, idcode: (BigInt, BigInt)) extends JtagModu
 class JtagRegisterTester(val c: JtagClocked[JtagRegisterModule]) extends JtagTester(c) {
   import BinaryParse._
 
-  // Necessary to get cross-clock-domain registers into reset state
-  poke(c.reset, 1)
-  poke(c.io.jtag.TCK, 0)
-  step(1)
-  poke(c.io.jtag.TCK, 1)
-  step(1)
-  poke(c.reset, 0)
-  step(1)
-
   resetToIdle()
   expect(c.io.reg, 42)  // reset sanity check
   idleToIRShift()

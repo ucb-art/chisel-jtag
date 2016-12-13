@@ -63,11 +63,15 @@ object JtagState {
   * Usage notes:
   * - 6.1.1.1b state transitions occur on TCK rising edge
   * - 6.1.1.1c actions can occur on the following TCK falling or rising edge
+  *
+  *
   */
-class JtagStateMachine extends Module {
+class JtagStateMachine extends Module(override_reset=Some(false.B)) {
   class StateMachineIO extends Bundle {
     val tms = Input(Bool())
     val currState = Output(JtagState.State.chiselType())
+
+    val asyncReset = Input(Bool())  // TODO: IMPLEMENT ME
   }
   val io = IO(new StateMachineIO)
 

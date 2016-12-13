@@ -20,14 +20,20 @@ class JtagIO extends Bundle {
 class JtagOutput(irLength: Int) extends Bundle {
   val state = Output(JtagState.State.chiselType())  // state, transitions on TCK rising edge
   val instruction = Output(UInt(irLength.W))  // current active instruction
+  val reset = Output(Bool())  // synchronous reset asserted in Test-Logic-Reset state, should NOT hold the FSM in reset
 
   override def cloneType = new JtagOutput(irLength).asInstanceOf[this.type]
+}
+
+class JtagControl extends Bundle {
+  val fsmAsyncReset = Input(Bool())  // TODO: asynchronous reset for FSM, used for TAP_POR*
 }
 
 /** Aggregate JTAG block IO.
   */
 class JtagBlockIO(irLength: Int) extends Bundle {
   val jtag = new JtagIO
+  val control = new JtagControl
   val output = new JtagOutput(irLength)
 
   override def cloneType = new JtagBlockIO(irLength).asInstanceOf[this.type]
@@ -65,6 +71,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   stateMachine.io.tms := io.jtag.TMS
   val currState = stateMachine.io.currState
   io.output.state := stateMachine.io.currState
+  stateMachine.io.asyncReset := io.control.fsmAsyncReset
 
   //
   // Instruction Register
@@ -84,7 +91,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   val nextActiveInstruction = Wire(UInt(irLength.W))
   val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
 
-  when (currState === JtagState.TestLogicReset.U) {
+  when (reset) {
     nextActiveInstruction := initialInstruction.U(irLength.W)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {
@@ -94,6 +101,8 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
     updateInstruction := false.B
   }
   io.output.instruction := activeInstruction
+
+  io.output.reset := currState === JtagState.TestLogicReset.U
 
   //
   // Data Register
@@ -118,7 +127,8 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
 }
 
 object JtagTapGenerator {
-  /** JTAG TAP generator, enclosed module must be clocked from TCK.
+  /** JTAG TAP generator, enclosed module must be clocked from TCK and reset from output of this
+    * block.
     *
     * @param irLength length, in bits, of instruction register, must be at least 2
     * @param instructions map of data register chains to instruction codes that select that data
@@ -208,6 +218,7 @@ object JtagTapGenerator {
     val internalIo = Wire(new JtagBlockIO(irLength))
 
     controllerInternal.io.jtag <> internalIo.jtag
+    controllerInternal.io.control <> internalIo.control
     controllerInternal.io.output <> internalIo.output
 
     internalIo

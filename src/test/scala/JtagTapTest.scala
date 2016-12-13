@@ -52,7 +52,7 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     expectedInstruction = expected
   }
 
-  /** Resets the test block using 5 TMS transitions
+  /** Resets the test block using 5 TMS transitions.
     */
   def tmsReset() {
     poke(jtag.TMS, 1)
@@ -215,18 +215,23 @@ trait JtagModule extends Module {
 }
 
 class JtagClocked[T <: JtagModule](gen: ()=>T) extends Module {
-  class Reclocked(modClock: Clock) extends Module(override_clock=Some(modClock)) {
+  class Reclocked(modClock: Clock, modReset: Bool)
+      extends Module(override_clock=Some(modClock), override_reset=Some(modReset)) {
     val mod = Module(gen())
     val io = IO(mod.io.cloneType)
     io <> mod.io
   }
 
   val innerClock = Wire(Bool())
-  val clockMod = Module(new Reclocked(innerClock.asClock))
+  val innerReset = Wire(Bool())
+  val clockMod = Module(new Reclocked(innerClock.asClock, innerReset))
 
   val io = IO(clockMod.io.cloneType)
   io <> clockMod.io
   innerClock := io.jtag.TCK
+  innerReset := clockMod.io.output.reset
+
+  clockMod.io.control.fsmAsyncReset := false.B
 }
 
 object JtagClocked {

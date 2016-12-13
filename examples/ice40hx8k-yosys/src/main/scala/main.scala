@@ -18,18 +18,19 @@ class top extends Module {
   class ModIO extends Bundle {
     val jtag = new JtagIO
 
-    val out0 = Output(Vec(8, Bool()))
-    val out1 = Output(Vec(3, Bool()))
-    val out2 = Output(Vec(3, Bool()))
+    val out0 = Output(UInt(8.W))
+    val out1 = Output(UInt(3.W))
+    val out2 = Output(UInt(3.W))
   }
 
   val io = IO(new ModIO)
   val irLength = 3
 
-  class JtagTapClocked (modClock: Clock) extends Module(override_clock=Some(modClock)) {
-    val reg0 = Reg(UInt(8.W), init=42.U)
-    val reg1 = Reg(UInt(3.W), init=0.U)
-    val reg2 = Reg(UInt(3.W), init=7.U)
+  class JtagTapClocked (modClock: Clock, modReset: Bool)
+      extends Module(override_clock=Some(modClock), override_reset=Some(modReset)) {
+    val reg0 = Reg(UInt(8.W), init=0x55.U)
+    val reg1 = Reg(UInt(3.W), init=5.U)
+    val reg2 = Reg(UInt(3.W), init=5.U)
 
     val chain0 = Module(new CaptureUpdateChain(8))
     chain0.io.capture.bits := reg0
@@ -53,7 +54,7 @@ class top extends Module {
           chain0 -> 1,
           chain1 -> 2,
           chain2 -> 3
-        ), 
+        ),
         idcode=Some((6, JtagIdcode(0xA, 0x123, 0x42))))
     val io = IO(new ClockedBlockIO(irLength))
     io.jtag <> tapIo.jtag
@@ -64,12 +65,15 @@ class top extends Module {
   }
 
   // Support for multiple internally-chained JTAG TAPs
+  val tap_reset = Wire(Bool())
   val taps = List(
-      Module(new JtagTapClocked(io.jtag.TCK.asClock))
+      Module(new JtagTapClocked(io.jtag.TCK.asClock, tap_reset))
   )
+  tap_reset := taps.map(_.io.output.reset).fold(false.B)(_||_)
   for (tap <- taps) {
     tap.io.jtag.TCK := io.jtag.TCK
     tap.io.jtag.TMS := io.jtag.TMS
+    tap.io.control.fsmAsyncReset := false.B
   }
   taps.head.io.jtag.TDI := io.jtag.TDI
   for (List(prev, next) <- taps sliding 2) {
@@ -77,15 +81,9 @@ class top extends Module {
   }
   io.jtag.TDO := taps.last.io.jtag.TDO
 
-  for (i <- 0 until 8) {
-    io.out0(i) := taps.head.io.reg0(i)
-  }
-  for (i <- 0 until 3) {
-    io.out1(i) := taps.head.io.reg1(i)
-  }
-  for (i <- 0 until 3) {
-    io.out2(i) := taps.head.io.reg2(i)
-  }
+  io.out0 := taps.head.io.reg0
+  io.out1 := taps.head.io.reg1
+  io.out2 := taps.head.io.reg2
 }
 
 object Top {
