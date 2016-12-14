@@ -53,6 +53,59 @@ class JtagBypassChainTest(val c: JtagBypassChain) extends PeekPokeTester(c) {
   expect(c.io.chainOut.data, 0)
 }
 
+class CaptureChainTest(val c: CaptureChain) extends PeekPokeTester(c) {
+  import BinaryParse._
+
+  poke(c.io.chainIn.shift, 0)
+  poke(c.io.chainIn.data, 0)
+  poke(c.io.chainIn.capture, 0)
+  poke(c.io.chainIn.update, 0)
+
+  expect(c.io.chainOut.shift, 0)
+  expect(c.io.chainOut.capture, 0)
+  expect(c.io.chainOut.update, 0)
+
+  // Test capture and shift
+  poke(c.io.capture.bits, "01001110".b)
+  poke(c.io.chainIn.capture, 1)
+  expect(c.io.chainOut.shift, 0)
+  expect(c.io.chainOut.capture, 1)
+  expect(c.io.chainOut.update, 0)
+  expect(c.io.capture.capture, 1)
+
+  step(1)
+
+  poke(c.io.chainIn.capture, 0)
+  poke(c.io.chainIn.shift, 1)
+  expect(c.io.chainOut.shift, 1)
+  expect(c.io.chainOut.capture, 0)
+  expect(c.io.chainOut.update, 0)
+  expect(c.io.capture.capture, 0)
+
+  expect(c.io.chainOut.data, 0)
+  poke(c.io.chainIn.data, 1)
+
+  step(1)
+
+  expect(c.io.chainOut.data, 1)
+  poke(c.io.chainIn.data, 1)
+
+  step(1)
+
+  expect(c.io.chainOut.data, 1)
+  poke(c.io.chainIn.data, 0)
+
+  step(1)
+
+  expect(c.io.chainOut.data, 1)
+  poke(c.io.chainIn.data, 1)
+
+  step(1)
+
+  expect(c.io.chainOut.data, 0)
+  poke(c.io.chainIn.data, 1)
+}
+
 class CaptureUpdateChainTest(val c: CaptureUpdateChain) extends PeekPokeTester(c) {
   import BinaryParse._
 
@@ -174,6 +227,11 @@ class JtagShifterSpec extends ChiselFlatSpec {
   "JATG bypass chain" should "work" in {
     Driver(() => new JtagBypassChain()) {
       c => new JtagBypassChainTest(c)
+    } should be (true)
+  }
+  "8-bit capture chain" should "work" in {
+    Driver(() => new CaptureChain(8)) {
+      c => new CaptureChainTest(c)
     } should be (true)
   }
   "8-bit capture-update chain" should "work" in {

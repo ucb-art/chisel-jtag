@@ -155,7 +155,7 @@ object JtagTapGenerator {
     // Create IDCODE chain if needed
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
-        val module = Module(new CaptureUpdateChain(32))  // TODO: replace with just capture chain
+        val module = Module(new CaptureChain(32))  // TODO: replace with just capture chain
         require(idcode % 2 == 1, "LSB must be set in IDCODE, see 12.1.1d")
         require(((idcode >> 1) & ((1 << 11) - 1)) != JtagIdcode.dummyMfrId, "IDCODE must not have 0b00001111111 as manufacturer identity, see 12.2.1b")
         module.io.capture.bits := idcode.U(32.W)

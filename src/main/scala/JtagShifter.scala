@@ -28,6 +28,16 @@ trait ChainIO extends Bundle {
   val chainOut = Output(new ShifterIO)
 }
 
+class Capture[+T <: Data](gen: T) extends Bundle {
+  val bits = Input(gen)  // data to capture, should be always valid
+  val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
+  override def cloneType: this.type = Capture(gen).asInstanceOf[this.type]
+}
+
+object Capture {
+  def apply[T <: Data](gen: T): Capture[T] = new Capture(gen)
+}
+
 /** Trait that all JTAG chains (data and instruction registers) must extend, providing basic chain
   * IO.
   */
@@ -58,6 +68,38 @@ class JtagBypassChain extends Chain {
       && !(io.chainIn.update && io.chainIn.shift))
 }
 
+/** Simple n-element shift register with parallel capture only, for read-only data registers.
+  *
+  * Useful notes:
+  * 7.2.1c shifter shifts on TCK rising edge
+  * 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
+  */
+class CaptureChain(n: Int) extends Chain {
+  class ModIO extends ChainIO {
+    val capture = Capture(UInt(n.W))
+  }
+  val io = IO(new ModIO)
+  io.chainOut chainControlFrom io.chainIn
+
+  val regs = (0 until n) map (x => Reg(Bool()))
+
+  io.chainOut.data := regs(0)
+
+  when (io.chainIn.capture) {
+    (0 until n) map (x => regs(x) := io.capture.bits(x))
+    io.capture.capture := true.B
+  } .elsewhen (io.chainIn.update) {
+    io.capture.capture := false.B
+  } .elsewhen (io.chainIn.shift) {
+    regs(n-1) := io.chainIn.data
+    (0 until n-1) map (x => regs(x) := regs(x+1))
+    io.capture.capture := false.B
+  }
+  assert(!(io.chainIn.capture && io.chainIn.update)
+      && !(io.chainIn.capture && io.chainIn.shift)
+      && !(io.chainIn.update && io.chainIn.shift))
+}
+
 /** Simple n-element shift register with parallel capture and update. Useful for general
   * instruction and data scan registers.
   *
@@ -66,14 +108,9 @@ class JtagBypassChain extends Chain {
   * 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   */
 class CaptureUpdateChain(n: Int) extends Chain {
-  class CaptureIO extends Bundle {
-    val bits = Input(UInt(n.W))  // data to capture, should be always valid
-    val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
-  }
-
   class ModIO extends ChainIO {
-    val capture = new CaptureIO()
-    val update = Output(Valid(UInt(n.W)))  // valid high when in update state (single cycle), contents may change any time after
+    val capture = Capture(UInt(n.W))
+    val update = Valid(UInt(n.W))  // valid high when in update state (single cycle), contents may change any time after
   }
   val io = IO(new ModIO)
   io.chainOut chainControlFrom io.chainIn
