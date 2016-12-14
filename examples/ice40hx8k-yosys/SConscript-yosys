@@ -2,7 +2,7 @@ Import('env')
 
 env.SetDefault(YOSYS = 'yosys')
 env.SetDefault(YOSYS_CMD = '')
-env.SetDefault(SYNTHCOM = 'yosys -p "$YOSYS_CMD" $SOURCE -q')
+env.SetDefault(SYNTHCOM = 'yosys -p "$YOSYS_CMD" $SOURCES -q')
 env.SetDefault(SYNTHCOMSTR = '$SYNTH')
 
 env.SetDefault(ARACHNE = 'arachne-pnr')

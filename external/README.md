@@ -1,0 +1,1 @@
+This contains utilities pulled in from rocket-chip, where the copyright is owned by SiFive. The repository-wide license at the repository root does not apply here, and the license here does not apply to the rest of this repository.
