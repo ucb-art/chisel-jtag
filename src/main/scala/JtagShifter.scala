@@ -88,8 +88,6 @@ class CaptureChain(n: Int) extends Chain {
   when (io.chainIn.capture) {
     (0 until n) map (x => regs(x) := io.capture.bits(x))
     io.capture.capture := true.B
-  } .elsewhen (io.chainIn.update) {
-    io.capture.capture := false.B
   } .elsewhen (io.chainIn.shift) {
     regs(n-1) := io.chainIn.data
     (0 until n-1) map (x => regs(x) := regs(x+1))
