@@ -92,18 +92,20 @@ io.status <> tap.io.status
 
 ## Hardware Verification
 This generator has been used in these designs:
-- None yet.
+- Example design on [ICE40HX8K-B-EVN (Lattice iCE40 FPGA) through Yosys](examples/ice40hx8k-yosys)
 
 Planned:
-- ICE40HX8K-B-EVN (Lattice iCE40 FPGA)
+- None currently.
 
 ## TODOs
 Some features are yet to be implemented:
-- Ability to annotate arbitrary registers in arbitrary modules to be written to / read from using JTAG. This will probably be implemented as a FIRRTL transform.
+- Asynchronous reset through TRST, for ASICs without POR capability.
+- Optionally positive edge clocked outputs, for internal TAP chains.
 - Capture-only and update-only scan chains. This is mainly an optimization.
+- Ability to annotate arbitrary registers in arbitrary modules to be written to / read from using JTAG. This will probably be implemented as a FIRRTL transform.
 - Boundary-scan, technically needed to chain JTAG compliance. This may be difficult as it requires clock crossing domains and messing up can result in logic glitches that fry a chip.
+- JTAG Route Controllers, to disable / enable specific TAPs.
 - Other JTAG optional instructions, like TMP.
-- Asynchronous reset through TRST. This is an optional part of the spec and is of low importance.
 
 Some features need a bit more thought:
 - Arbiters / arbiter generators so a data chain can act as a low priority (relative to the system) bus master. Possibly also a FIRRTL transform to hook up such an arbiter to an existing system bus.
