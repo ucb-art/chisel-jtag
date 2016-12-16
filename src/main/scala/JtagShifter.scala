@@ -83,8 +83,7 @@ class CaptureChain[+T <: Data](gen: T) extends Chain {
   val io = IO(new ModIO)
   io.chainOut chainControlFrom io.chainIn
 
-  val bits = gen.asUInt.cloneType
-  val n = DataMirror.widthOf(bits) match {
+  val n = DataMirror.widthOf(gen) match {
     case KnownWidth(x) => x
     case _ => require(false, s"can't generate chain for unknown width data type $gen"); -1  // TODO: remove -1 type hack
   }
@@ -99,6 +98,8 @@ class CaptureChain[+T <: Data](gen: T) extends Chain {
   } .elsewhen (io.chainIn.shift) {
     regs(n-1) := io.chainIn.data
     (0 until n-1) map (x => regs(x) := regs(x+1))
+    io.capture.capture := false.B
+  } .otherwise {
     io.capture.capture := false.B
   }
   assert(!(io.chainIn.capture && io.chainIn.update)
@@ -121,8 +122,7 @@ class CaptureUpdateChain[+T <: Data](gen: T) extends Chain {
   val io = IO(new ModIO)
   io.chainOut chainControlFrom io.chainIn
 
-  val bits = gen.asUInt.cloneType
-  val n = DataMirror.widthOf(bits) match {
+  val n = DataMirror.widthOf(gen) match {
     case KnownWidth(x) => x
     case _ => require(false, s"can't generate chain for unknown width data type $gen"); -1  // TODO: remove -1 type hack
   }
@@ -142,6 +142,9 @@ class CaptureUpdateChain[+T <: Data](gen: T) extends Chain {
   } .elsewhen (io.chainIn.shift) {
     regs(n-1) := io.chainIn.data
     (0 until n-1) map (x => regs(x) := regs(x+1))
+    io.capture.capture := false.B
+    io.update.valid := false.B
+  } .otherwise {
     io.capture.capture := false.B
     io.update.valid := false.B
   }
