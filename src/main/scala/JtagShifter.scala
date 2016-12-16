@@ -3,6 +3,8 @@
 package jtag
 
 import chisel3._
+import chisel3.core.DataMirror
+import chisel3.internal.firrtl.KnownWidth
 import chisel3.util._
 
 /** Base JTAG shifter IO, viewed from input to shift register chain.
@@ -29,7 +31,7 @@ trait ChainIO extends Bundle {
 }
 
 class Capture[+T <: Data](gen: T) extends Bundle {
-  val bits = Input(gen)  // data to capture, should be always valid
+  val bits = Input(gen.cloneType)  // data to capture, should be always valid
   val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
   override def cloneType: this.type = Capture(gen).asInstanceOf[this.type]
 }
@@ -74,19 +76,25 @@ class JtagBypassChain extends Chain {
   * 7.2.1c shifter shifts on TCK rising edge
   * 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   */
-class CaptureChain(n: Int) extends Chain {
+class CaptureChain[+T <: Data](gen: T) extends Chain {
   class ModIO extends ChainIO {
-    val capture = Capture(UInt(n.W))
+    val capture = Capture(gen)
   }
   val io = IO(new ModIO)
   io.chainOut chainControlFrom io.chainIn
+
+  val bits = gen.asUInt.cloneType
+  val n = DataMirror.widthOf(bits) match {
+    case KnownWidth(x) => x
+    case _ => require(false, s"can't generate chain for unknown width data type $gen"); -1  // TODO: remove -1 type hack
+  }
 
   val regs = (0 until n) map (x => Reg(Bool()))
 
   io.chainOut.data := regs(0)
 
   when (io.chainIn.capture) {
-    (0 until n) map (x => regs(x) := io.capture.bits(x))
+    (0 until n) map (x => regs(x) := io.capture.bits.asUInt()(x))
     io.capture.capture := true.B
   } .elsewhen (io.chainIn.shift) {
     regs(n-1) := io.chainIn.data
@@ -105,21 +113,27 @@ class CaptureChain(n: Int) extends Chain {
   * 7.2.1c shifter shifts on TCK rising edge
   * 4.3.2a TDI captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
   */
-class CaptureUpdateChain(n: Int) extends Chain {
+class CaptureUpdateChain[+T <: Data](gen: T) extends Chain {
   class ModIO extends ChainIO {
-    val capture = Capture(UInt(n.W))
-    val update = Valid(UInt(n.W))  // valid high when in update state (single cycle), contents may change any time after
+    val capture = Capture(gen)
+    val update = Valid(gen)  // valid high when in update state (single cycle), contents may change any time after
   }
   val io = IO(new ModIO)
   io.chainOut chainControlFrom io.chainIn
 
+  val bits = gen.asUInt.cloneType
+  val n = DataMirror.widthOf(bits) match {
+    case KnownWidth(x) => x
+    case _ => require(false, s"can't generate chain for unknown width data type $gen"); -1  // TODO: remove -1 type hack
+  }
+
   val regs = (0 until n) map (x => Reg(Bool()))
 
   io.chainOut.data := regs(0)
-  io.update.bits := Cat(regs.reverse)
+  io.update.bits := io.update.bits.fromBits(Cat(regs.reverse))
 
   when (io.chainIn.capture) {
-    (0 until n) map (x => regs(x) := io.capture.bits(x))
+    (0 until n) map (x => regs(x) := io.capture.bits.asUInt()(x))
     io.capture.capture := true.B
     io.update.valid := false.B
   } .elsewhen (io.chainIn.update) {

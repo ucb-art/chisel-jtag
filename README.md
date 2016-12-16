@@ -12,6 +12,8 @@ The implementation is clocked from the JTAG clock, allowing the JTAG block to fu
 ### Experimental!
 This is still an experimental design and the API is still subject to change.
 
+### *Some documentation may be out of date.*
+
 ## Using
 ### The Basics
 Import the necessary packages:
