@@ -106,7 +106,7 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
   import BinaryParse._
 
   "JTAG bypass chain" should "work" in {
-    run(new JtagBypassChain()) { implicit t => c =>
+    run(JtagBypassChain()) { implicit t => c =>
       nop(c.io)
       step()
 
@@ -159,7 +159,7 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
   }
 
   "8-bit capture chain" should "work" in {
-    run(new CaptureChain(UInt(8.W))) { implicit t => c =>
+    run(CaptureChain(UInt(8.W))) { implicit t => c =>
       // Test capture and shift
       c.io.capture.bits <<= "01001110".b
       capture(c.io)

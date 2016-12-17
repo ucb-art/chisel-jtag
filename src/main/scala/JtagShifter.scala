@@ -70,6 +70,10 @@ class JtagBypassChain extends Chain {
       && !(io.chainIn.update && io.chainIn.shift))
 }
 
+object JtagBypassChain {
+  def apply() = new JtagBypassChain
+}
+
 /** Simple n-element shift register with parallel capture only, for read-only data registers.
   *
   * Useful notes:
@@ -105,6 +109,10 @@ class CaptureChain[+T <: Data](gen: T) extends Chain {
   assert(!(io.chainIn.capture && io.chainIn.update)
       && !(io.chainIn.capture && io.chainIn.shift)
       && !(io.chainIn.update && io.chainIn.shift))
+}
+
+object CaptureChain {
+  def apply[T <: Data](gen: T) = new CaptureChain(gen)
 }
 
 /** Simple n-element shift register with parallel capture and update. Useful for general
@@ -164,11 +172,7 @@ class CaptureUpdateChain[+T <: Data, +V <: Data](genCapture: T, genUpdate: V) ex
 }
 
 object CaptureUpdateChain {
-  def apply[T <: Data](gen: T): CaptureUpdateChain[T, T] = {
-    new CaptureUpdateChain(gen, gen)
-  }
-
-  def apply[T <: Data, V <: Data](genCapture: T, genUpdate: V): CaptureUpdateChain[T, V] = {
+  def apply[T <: Data](gen: T) = new CaptureUpdateChain(gen, gen)
+  def apply[T <: Data, V <: Data](genCapture: T, genUpdate: V) =
     new CaptureUpdateChain(genCapture, genUpdate)
-  }
 }
