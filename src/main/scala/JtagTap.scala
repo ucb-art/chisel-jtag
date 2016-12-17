@@ -79,7 +79,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   // 7.1.1d IR shifter two LSBs must be b01 pattern
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
   // 7.2.1a behavior of instruction register and shifters
-  val irShifter = Module(new CaptureUpdateChain(UInt(irLength.W)))
+  val irShifter = Module(CaptureUpdateChain(UInt(irLength.W)))
   irShifter.io.chainIn.shift := currState === JtagState.ShiftIR.U
   irShifter.io.chainIn.data := io.jtag.TDI
   irShifter.io.chainIn.capture := currState === JtagState.CaptureIR.U

@@ -61,7 +61,7 @@ class JtagRegisterModule() extends JtagModule {
 
   val reg = Reg(UInt(8.W), init=42.U)
 
-  val chain = Module(new CaptureUpdateChain(UInt(8.W)))
+  val chain = Module(CaptureUpdateChain(UInt(8.W)))
   chain.io.capture.bits := reg
   when (chain.io.update.valid) {
     reg := chain.io.update.bits

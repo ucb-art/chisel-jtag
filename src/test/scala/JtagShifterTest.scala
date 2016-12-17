@@ -77,25 +77,25 @@ trait ChainIOUtils extends ImplicitPokeTester {
   }
 
   // CaptureUpdateChain test utilities
-  def nop(io: CaptureUpdateChain[Data]#ModIO)(implicit t: InnerTester) {
+  def nop(io: CaptureUpdateChain[Data, Data]#ModIO)(implicit t: InnerTester) {
     nop(io.asInstanceOf[ChainIO])
     io.capture.capture ?== 0
     io.update.valid ?== 0
   }
 
-  def capture(io: CaptureUpdateChain[Data]#ModIO)(implicit t: InnerTester) {
+  def capture(io: CaptureUpdateChain[Data, Data]#ModIO)(implicit t: InnerTester) {
     capture(io.asInstanceOf[ChainIO])
     io.capture.capture ?== 1
     io.update.valid ?== 0
   }
 
-  def shift(io: CaptureUpdateChain[Data]#ModIO, expectedDataOut: BigInt, dataIn: BigInt)(implicit t: InnerTester) {
+  def shift(io: CaptureUpdateChain[Data, Data]#ModIO, expectedDataOut: BigInt, dataIn: BigInt)(implicit t: InnerTester) {
     shift(io.asInstanceOf[ChainIO], expectedDataOut, dataIn)
     io.capture.capture ?== 0
     io.update.valid ?== 0
   }
 
-  def update(io: CaptureUpdateChain[Data]#ModIO)(implicit t: InnerTester) {
+  def update(io: CaptureUpdateChain[Data, Data]#ModIO)(implicit t: InnerTester) {
     update(io.asInstanceOf[ChainIO])
     io.capture.capture ?== 0
     io.update.valid ?== 1
@@ -183,7 +183,7 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
   }
 
   "8-bit capture-update chain" should "work" in {
-    run(new CaptureUpdateChain(UInt(8.W))) { implicit t => c =>
+    run(CaptureUpdateChain(UInt(8.W))) { implicit t => c =>
       // Test capture and shift
       c.io.capture.bits <<= "01001110".b
       capture(c.io)
@@ -269,7 +269,7 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
       // Ordering should be:
       // b[1:0] a c[2] c[1] c[0] x.d x.c[1:0]
     }
-    run(new CaptureUpdateChain(new TestBundle)) { implicit t => c =>
+    run(CaptureUpdateChain(new TestBundle)) { implicit t => c =>
       val cap = c.io.capture.bits
       val upd = c.io.update.bits
 
@@ -285,7 +285,7 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
       capture(c.io)
       step()
 
-      shift(c.io, 1, 1)  // update LSB, capture LSB
+      shift(c.io, 1, 1)  // capture LSB, update LSB
       step()
       shift(c.io, 0, 1)
       step()
@@ -301,7 +301,7 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
       step()
       shift(c.io, 1, 0)
       step()
-      shift(c.io, 0, 1)  // update MSB, capture MSB
+      shift(c.io, 0, 1)  // capture MSB, update MSB
       step()
 
       update(c.io)
@@ -313,6 +313,47 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
       upd.x.d ?== 0
       upd.x.c ?== "11".b
       step()
+    }
+  }
+
+  "Capture-update chain with larger capture width" should "work" in {
+    run(CaptureUpdateChain(UInt(4.W), UInt(2.W))) { implicit t => c =>
+      c.io.capture.bits <<= "1101".b
+      capture(c.io)
+      step()
+
+      shift(c.io, 1, 0)  // capture LSB, update LSB
+      step()
+      shift(c.io, 0, 1)  // update MSB
+      step()
+      shift(c.io, 1, 1)
+      step()
+      shift(c.io, 1, 1)  // capture MSB
+      step()
+
+      update(c.io)
+      c.io.update.bits ?== "10".b
+    }
+  }
+
+
+  "Capture-update chain with larger update width" should "work" in {
+    run(CaptureUpdateChain(UInt(2.W), UInt(4.W))) { implicit t => c =>
+      c.io.capture.bits <<= "10".b
+      capture(c.io)
+      step()
+
+      shift(c.io, 0, 1)  // capture LSB, update LSB
+      step()
+      shift(c.io, 1, 0)  // capture MSB
+      step()
+      shift(c.io, 0, 1)
+      step()
+      shift(c.io, 0, 1)  // update MSB
+      step()
+
+      update(c.io)
+      c.io.update.bits ?== "1101".b
     }
   }
 }
