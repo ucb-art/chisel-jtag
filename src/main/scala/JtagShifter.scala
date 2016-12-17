@@ -31,7 +31,7 @@ trait ChainIO extends Bundle {
 }
 
 class Capture[+T <: Data](gen: T) extends Bundle {
-  val bits = Input(gen.cloneType)  // data to capture, should be always valid
+  val bits = Input(gen)  // data to capture, should be always valid
   val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
   override def cloneType: this.type = Capture(gen).asInstanceOf[this.type]
 }
@@ -74,7 +74,9 @@ object JtagBypassChain {
   def apply() = new JtagBypassChain
 }
 
-/** Simple n-element shift register with parallel capture only, for read-only data registers.
+/** Simple shift register with parallel capture only, for read-only data registers.
+  *
+  * Number of stages is the number of bits in gen, which must have a known width.
   *
   * Useful notes:
   * 7.2.1c shifter shifts on TCK rising edge
@@ -115,8 +117,11 @@ object CaptureChain {
   def apply[T <: Data](gen: T) = new CaptureChain(gen)
 }
 
-/** Simple n-element shift register with parallel capture and update. Useful for general
-  * instruction and data scan registers.
+/** Simple shift register with parallel capture and update. Useful for general instruction and data
+  * scan registers.
+  *
+  * Number of stages is the max number of bits in genCapture and genUpdate, both of which must have
+  * known widths. If there is a width mismatch, the unused most significant bits will be zero.
   *
   * Useful notes:
   * 7.2.1c shifter shifts on TCK rising edge
@@ -172,6 +177,8 @@ class CaptureUpdateChain[+T <: Data, +V <: Data](genCapture: T, genUpdate: V) ex
 }
 
 object CaptureUpdateChain {
+  /** Capture-update chain with matching capture and update types.
+    */
   def apply[T <: Data](gen: T) = new CaptureUpdateChain(gen, gen)
   def apply[T <: Data, V <: Data](genCapture: T, genUpdate: V) =
     new CaptureUpdateChain(genCapture, genUpdate)
