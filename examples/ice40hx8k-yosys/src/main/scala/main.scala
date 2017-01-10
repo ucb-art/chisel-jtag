@@ -55,7 +55,7 @@ class Top extends Module {
     io.reg2 := reg2
   }
 
-  // Generate arbitrary number of chained TAPs
+  // Generate TAP
   val tap_reset = Wire(Bool())
   val tap = Module(new JtagTapClocked(io.jtag.TCK.asClock, tap_reset))
   tap_reset := tap.io.output.reset
