@@ -33,7 +33,7 @@ trait ChainIO extends Bundle {
 class Capture[+T <: Data](gen: T) extends Bundle {
   val bits = Input(gen)  // data to capture, should be always valid
   val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
-  override def cloneType: this.type = Capture(gen).asInstanceOf[this.type]
+  override def cloneType = Capture(gen).asInstanceOf[this.type]
 }
 
 object Capture {
