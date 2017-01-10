@@ -1,10 +1,13 @@
 Import('env')
 
-blif = env.Synthesize('top', ['build/top.v', '#../../external/vsrc/AsyncResetReg.v'])
-asc = env.PlaceRoute(blif, pcf='top.pcf')
+blif = env.Synthesize('top', ['build/Top.v', '#../../external/vsrc/AsyncResetReg.v'])
+asc = env.PlaceRoute(blif, pcf='ice40hx8k-b-evn.pcf')
 bits = env.BitGen(asc)
 report = env.Timing(asc)
 
 env.Default(bits, report)
 
-env.Alias('prog', [env.BitProg(bits), report])
+env.Alias('prog', [env.BitProg('prog', bits), report])
+env_sram = env.Clone()
+env_sram.Append(BITPROGOPTS = '-S')
+env.Alias('prog-sram', [env_sram.BitProg('prog-sram', bits), report])
