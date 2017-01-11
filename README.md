@@ -37,17 +37,16 @@ Invoke the TAP generator:
 ```
 // Generate a JTAG TAP with a 2-bit IR and IDCODE instruction code of b00.
 // BYPASS chain is selected for all other instruction codes.
-val tap = JtagTapGenerator(2, Map(), idcode=Some((0, JtagIdcode(0xA, 0x123, 0x42))))
+val tapIo = JtagTapGenerator(2, Map(), idcode=Some((0, JtagIdcode(0xA, 0x123, 0x42))))
 io.jtag <> tap.io.jtag
-io.output <> tap.io.output
-io.status <> tap.io.status
+// tapIo.output.instruction provides the current active instruction, negative-edge latched per the spec.
 ```
 
-JtagTapGenerator instantiates a TAP controller block (which is its return value) and some predefined data scan chain blocks (like the required BYPASS and optional IDCODE registers). It also generates the necessary muxes between the controller and the connected data chains (selected by currently active instruction). On a Module hierarchy level, this means that the generated TAP controller, generated data scan chains (BYPASS and possibly IDCODE), and any user-defined data chains are directly inside the same Module.
+JtagTapGenerator instantiates a TAP controller block (returning its IO) and some predefined data scan chain blocks (like the required BYPASS and optional IDCODE registers). It also generates the necessary muxes between the controller and the connected data chains (selected by currently active instruction). On a Module hierarchy level, this means that the generated TAP controller, generated data scan chains (BYPASS and possibly IDCODE), and any user-defined data chains are directly inside the same Module.
 
 The arguments are:
 - `irLength`: Int - length, in bits, of the instruction register.
-- `instructions`: Map[Chain, BigInt] - a Map of data registers (Chains) to the instruction code that selects them.
+- `instructions`: Map[Chain, BigInt] - a Map of data registers (Chains) to the instruction code that selects them. Multiple instructions may select the same chains for scan, for example if the instructions have different state actions.
 - `idcode`: Option[(BigInt, BigInt)] - optional IDCODE generator. A value of None means to not generate a IDCODE register (and BYPASS, with an instruction code of all ones, will be selected as the initial instruction), while a value of (instruction code, idcode) generates the 32-bit IDCODE register and selects its corresponding instruction code as the initial instruction.
 
 All unused instruction codes will select the BYPASS register.
@@ -59,38 +58,35 @@ All unused instruction codes will select the BYPASS register.
 
 The current implemented `Chain`s are:
 - `JtagBypassChain()`: single stage bypass register with hard-coded zero on capture and no update. Users should not need to instantiate this, one is automatically provided by the generator.
-- `CaptureUpdateChain(n)`: a scan chain with parallel capture (load into shifter) and update (shifter valid).
-  - `n`: number of bits (or stages in the shift register)
+- `CaptureUpdateChain(captureType, updateType)`, `CaptureUpdateChain(type)`: a scan chain with parallel capture (load into shifter) and update (shifter valid).
+  - `captureType`, `updateType`, `type`: data model used for the capture and update types (or if only one is specified, it is used for both capture and update). The scan chain is the longer of the two input types and uses `fromBits` / `asUInt` ordering in ordering bits in `Aggregate` types. Capture is zero-padded at the most significant bits (as necessary), and update takes the least significant bits.
   - `CaptureUpdateChain` provides these IOs:
     - `capture`: a `CaptureIO` bundle, consisting of the parallel input `bits` and a `capture` Bool signal (which is a status indicator only). The parallel input should always be valid since `capture` may be asserted at any time.
-    - `update`: a `ValidIO` bundle, consisting of the parallel output `bits` and a `valid` Bool signal (which is high for only one TCK cycle, in the JTAG Update-* state). Note that `bits` output is _only+ guaranteed valid when `valid` is high. This may be fed (for example) into a (clock-crossing) FIFO or a register which updates on `valid`.
+    - `update`: a `ValidIO` bundle, consisting of the parallel output `bits` and a `valid` Bool signal (which is high for only one TCK cycle, in the JTAG Update-* state). Note that `bits` output is _only_ guaranteed valid when `valid` is high. This may be fed (for example) into a (clock-crossing) FIFO or a register which updates on `valid`.
+- `CaptureChain(type)`: a scan chain with parallel capture (load into shifter) only. Arguments and interface are similar to `CaptureUpdateChain` with the capture portion only.
 
 Example usage with TAP generator invocation:
 
 ```
-val myFunRegister = Reg(UInt(8.W))  // 8-bit example system register
-
 // Generate a 8-bit data scan chain with parallel capture and update
-val myDataChain = Module(new CaptureUpdateChain(8))
+val myDataChain = Module(new CaptureUpdateChain(UInt(8.W)))
 
-myDataChain.io.capture.bits := 0x42.U  // always capture 0x42
+val myFunRegister = Reg(UInt(8.W))  // 8-bit example system register
+myDataChain.io.capture.bits := myFunReg  // capture contents of register
 when (myDataChain.io.update.valid) {
-  myFunRegister := myDataChain.io.update.bits  // latch system register with scanned-in data
+  myFunRegister := myDataChain.io.update.bits  // update system register with scanned-in data
 }
 
 // Generate a JTAG TAP with a 2-bit IR and select myDataChain for scan when instruction code b01 is
 // active. Don't generate an IDCODE chain. BYPASS chain is selected for all other instruction codes.
 val tap = JtagTapGenerator(2, Map(myDataChain -> 1))
-io.jtag <> tap.io.jtag
-io.output <> tap.io.output
-io.status <> tap.io.status
 ```
 
 ### Misc Notes
 
 - There's a lot of elaboration-time error checking to prevent parameters that are contrary to the spec. For example, the generator will `require` out if attempting to set an IDCODE that conflicts with the JTAG spec's reserved dummy code.
   - It is a bug if the generator can generate non-spec-compliant designs - if this happens, please file an issue!
-  - Exception: boundary-scan is currently not implemented. Please don't file a bug for that.
+  - Exception: boundary-scan is currently not implemented. Please don't file a bug for that, it will be implemented eventually.
 
 ## Hardware Verification
 This generator has been used in these designs:
@@ -101,17 +97,18 @@ Planned:
 
 ## TODOs
 Some features are yet to be implemented:
-- Asynchronous reset through TRST, for ASICs without POR capability.
-- Optionally positive edge clocked outputs, for internal TAP chains.
-- Capture-only and update-only scan chains. This is mainly an optimization.
-- Ability to annotate arbitrary registers in arbitrary modules to be written to / read from using JTAG. This will probably be implemented as a FIRRTL transform.
+- Asynchronous reset through TRST, for ASICs without POR capability. This depends on cleaner asynchronous-reset register support in Chisel.
 - Boundary-scan, technically needed to chain JTAG compliance. This may be difficult as it requires clock crossing domains and messing up can result in logic glitches that fry a chip.
+- Ability to annotate arbitrary registers in arbitrary modules to be written to / read from using JTAG. This will probably be implemented as a FIRRTL transform.
+- Update-only scan chains - this is mainly a small optimization.
 - JTAG Route Controllers, to disable / enable specific TAPs.
 - Other JTAG optional instructions, like TMP.
+- Optionally positive edge clocked outputs, for internal TAP chains.
 
 Some features need a bit more thought:
 - Arbiters / arbiter generators so a data chain can act as a low priority (relative to the system) bus master. Possibly also a FIRRTL transform to hook up such an arbiter to an existing system bus.
 - Data chains with always-valid data output and glitchless updates, allowing the output to be used as a register. Possibly also a FIRRTL transform to replace a system register with such a register.
+- BSDL generation, and how it might integrate with tools like OpenOCD.
 
 Some cleaning up is also to be done:
 - Multiclock using chisel3's proposed `withClock` API, when it's done.
