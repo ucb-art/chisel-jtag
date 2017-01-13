@@ -88,12 +88,19 @@ val tap = JtagTapGenerator(2, Map(myDataChain -> 1))
   - It is a bug if the generator can generate non-spec-compliant designs - if this happens, please file an issue!
   - Exception: boundary-scan is currently not implemented. Please don't file a bug for that, it will be implemented eventually.
 
+### Package Structure
+No guarantees are made about the contents of the `examples` folder. In particular, do NOT depend on the contents of those (such as the async tools) in your designs.
+
 ## Hardware Verification
 This generator has been used in these designs:
 - Example design on [ICE40HX8K-B-EVN (Lattice iCE40 FPGA) through Yosys](examples/ice40hx8k-yosys)
 
 Planned:
 - None currently.
+
+## More Debugging Modules
+Check out the [builtin-debuggers](https://github.com/ucb-art/builtin-debugger) repository, which contains generators for debugging blocks like a logic analyzer and pattern generator that you can instantiate on your chip or FPGA and connect it through JTAG.
+
 
 ## TODOs
 Some features are yet to be implemented:
