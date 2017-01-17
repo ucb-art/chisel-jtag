@@ -71,7 +71,7 @@ class JtagStateMachine extends Module(override_reset=Some(false.B)) {
     val tms = Input(Bool())
     val currState = Output(JtagState.State.chiselType())
 
-    val asyncReset = Input(Bool())  // TODO: IMPLEMENT ME
+    val asyncReset = Input(Bool()) // TODO!
   }
   val io = IO(new StateMachineIO)
 

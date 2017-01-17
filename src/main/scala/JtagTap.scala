@@ -8,11 +8,11 @@ import chisel3.util._
 /** JTAG signals, viewed from the device side.
   */
 class JtagIO extends Bundle {
-  // TRST (4.6) is optional and not currently implemented.
-  val TCK = Input(Bool())
-  val TMS = Input(Bool())
-  val TDI = Input(Bool())
-  val TDO = Output(new Tristate())
+  val TRSTn  = Input(Bool()) // TRST is an active-low signal. Name it accordingly.
+  val TCK   = Input(Bool())
+  val TMS   = Input(Bool())
+  val TDI   = Input(Bool())
+  val TDO   = Output(new Tristate())
 }
 
 /** JTAG block output signals.
