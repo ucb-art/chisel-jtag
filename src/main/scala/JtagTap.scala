@@ -131,8 +131,8 @@ object JtagTapGenerator {
     * block.
     *
     * @param irLength length, in bits, of instruction register, must be at least 2
-    * @param instructions map of data register chains to instruction codes that select that data
-    * register; instruction codes must be unique
+    * @param instructions map of instruction codes to data register chains that select that data
+    * register; multiple instructions may map to the same data chain
     * @param idcode optional idcode, tuple of (instruction code, idcode)
     *
     * @note all other instruction codes (not part of instructions or idcode) map to BYPASS
@@ -151,33 +151,27 @@ object JtagTapGenerator {
     * TODO:
     * - support concatenated scan chains
     */
-  def apply(irLength: Int, instructions: Map[Chain, BigInt], idcode:Option[(BigInt, BigInt)]=None): JtagBlockIO = {
+  def apply(irLength: Int, instructions: Map[BigInt, Chain], idcode:Option[(BigInt, BigInt)]=None): JtagBlockIO = {
     // Create IDCODE chain if needed
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
-        val module = Module(CaptureChain(UInt(32.W)))  // TODO: replace with just capture chain
+        val idcodeModule = Module(CaptureChain(UInt(32.W)))
         require(idcode % 2 == 1, "LSB must be set in IDCODE, see 12.1.1d")
         require(((idcode >> 1) & ((1 << 11) - 1)) != JtagIdcode.dummyMfrId, "IDCODE must not have 0b00001111111 as manufacturer identity, see 12.2.1b")
-        module.io.capture.bits := idcode.U(32.W)
-        instructions + (module -> icode)
+        require(!(instructions contains icode), "instructions may not contain IDCODE")
+        idcodeModule.io.capture.bits := idcode.U(32.W)
+        instructions + (icode -> idcodeModule)
       }
       case None => instructions
     }
 
-    val requiredBypassInstruction = (BigInt(1) << irLength) - 1
+    val bypassIcode = (BigInt(1) << irLength) - 1  // required BYPASS instruction
     val initialInstruction = idcode match {  // 7.2.1e load IDCODE or BYPASS instruction after entry into TestLogicReset
       case Some((icode, _)) => icode
-      case None => requiredBypassInstruction
+      case None => bypassIcode
     }
 
-    val allICodes = allInstructions.valuesIterator.toSeq
-    require(!allICodes.contains(requiredBypassInstruction), "must not contain BYPASS code")
-
-    // Ensure no duplicate instruction codes
-    // from: https://stackoverflow.com/questions/24729544/how-to-find-duplicates-in-a-list
-    val dupICodes = allICodes.groupBy(identity).  // map of iCode -> Seq(iCode) of all occurrences
-      collect{ case (x,ys) if ys.lengthCompare(1) > 0 => x }
-    require(dupICodes.size == 0, s"found duplicated instruction codes $dupICodes")
+    require(!(allInstructions contains bypassIcode), "instructions may not contain BYPASS code")
 
     val controllerInternal = Module(new JtagTapController(irLength, initialInstruction))
 
@@ -190,30 +184,44 @@ object JtagTapGenerator {
     val bypassChain = Module(JtagBypassChain())
 
     // The Great Data Register Chain Mux
-    bypassChain.io.chainIn := controllerInternal.io.dataChainOut  // for simplicity, doesn't visible affect anything lse
-    if (allInstructions.size == 0) {
-      // Why anyone would need this (JTAG controller with no data registers) is beyond me.
-      controllerInternal.io.dataChainIn := bypassChain.io.chainOut
-    } else {
-      val emptyWhen = when (false.B) { }  // Empty WhenContext to start things off
+    bypassChain.io.chainIn := controllerInternal.io.dataChainOut  // for simplicity, doesn't visibly affect anything else
+    require(allInstructions.size > 0, "Seriously? JTAG TAP with no instructions?")
 
-      def foldDef(res: WhenContext, x: (Chain, BigInt)): WhenContext = {
-        // Set chain input to controller when selected
-        val selected = controllerInternal.io.output.instruction === x._2.U(irLength.W)
-        when (selected) {
-          x._1.io.chainIn := controllerInternal.io.dataChainOut
-        } .otherwise {
-          x._1.io.chainIn := unusedChainOut
-        }
-        // Continue the WhenContext with if this chain is selected
-        res.elsewhen(selected) {
-          controllerInternal.io.dataChainIn := x._1.io.chainOut
-        }
-      }
-      allInstructions.toSeq.foldLeft(emptyWhen)(foldDef).otherwise {
-        controllerInternal.io.dataChainIn := bypassChain.io.chainOut
+    val chainToIcode = allInstructions groupBy { case (icode, chain) => chain } map {
+      case (chain, icodeToChain) => chain -> icodeToChain.keys
+    }
+
+    val chainToSelect = chainToIcode map {
+      case (chain, icodes) => {
+        assume(icodes.size > 0)
+        val icodeSelects = icodes map { controllerInternal.io.output.instruction === _.asUInt(irLength.W) }
+        chain -> icodeSelects.reduceLeft(_||_)
       }
     }
+
+    def foldOutSelect(res: WhenContext, x: (Chain, Bool)): WhenContext = {
+      val (chain, select) = x
+      // Continue the WhenContext with if this chain is selected
+      res.elsewhen(select) {
+        controllerInternal.io.dataChainIn := chain.io.chainOut
+      }
+    }
+
+    val emptyWhen = when (false.B) { }  // Empty WhenContext to start things off
+    chainToSelect.toSeq.foldLeft(emptyWhen)(foldOutSelect).otherwise {
+      controllerInternal.io.dataChainIn := bypassChain.io.chainOut
+    }
+
+    def mapInSelect(x: (Chain, Bool)) {
+      val (chain, select) = x
+      when (select) {
+        chain.io.chainIn := controllerInternal.io.dataChainOut
+      } .otherwise {
+        chain.io.chainIn := unusedChainOut
+      }
+    }
+
+    chainToSelect.map(mapInSelect)
 
     val internalIo = Wire(new JtagBlockIO(irLength))
 

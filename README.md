@@ -46,7 +46,7 @@ JtagTapGenerator instantiates a TAP controller block (returning its IO) and some
 
 The arguments are:
 - `irLength`: Int - length, in bits, of the instruction register.
-- `instructions`: Map[Chain, BigInt] - a Map of data registers (Chains) to the instruction code that selects them. Multiple instructions may select the same chains for scan, for example if the instructions have different state actions.
+- `instructions`: Map[BigInt, Chain] - a Map of instruction code to the data register (Chain) that is selected for scan. Multiple instructions may select the same chains for scan, for example if the instructions have different state actions.
 - `idcode`: Option[(BigInt, BigInt)] - optional IDCODE generator. A value of None means to not generate a IDCODE register (and BYPASS, with an instruction code of all ones, will be selected as the initial instruction), while a value of (instruction code, idcode) generates the 32-bit IDCODE register and selects its corresponding instruction code as the initial instruction.
 
 All unused instruction codes will select the BYPASS register.

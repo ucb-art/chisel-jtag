@@ -34,9 +34,10 @@ class Top extends Module {
     chain2.io.capture.bits := reg2
 
     val tapIo = JtagTapGenerator(irLength, Map(
-          chain0 -> 1,
-          chain1 -> 2,
-          chain2 -> 3
+          0 -> chain0,  // test multiple instructions mapping ot same chain
+          1 -> chain0,
+          2 -> chain1,
+          3 -> chain2
         ),
         idcode=Some((14, JtagIdcode(0xA, 0x123, 0x42))))
 
