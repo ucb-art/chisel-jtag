@@ -83,10 +83,12 @@ val tap = JtagTapGenerator(2, Map(myDataChain -> 1))
 ```
 
 ### Status
-The Bundle returned by the TAP generator provides an `output` field providing TAP status which may be useful. `output` is a `JtagOutput` which provides these fields:
-- `state`: `JtagState`: current JTAG state, updated on the TCK rising edge.
-- `instruction`: `UInt`: current active instruction, updated on the TCK falling edge (as per the spec). This may be useful for logic that depends on the current instruction, like boundary-scan's EXTEST instruction.
-- `reset`: `Bool`: high if the TAP is in the Test-Logic-Reset state. This should be used as the reset signal for any JTAG block logic, like captured registers.
+The Bundle returned by the TAP generator provides an `output` field providing (possibly useful) TAP status. `output` contains these fields:
+- `state: JtagState`: current JTAG state, updated on the TCK rising edge.
+  - *Note: this uses nonstandard Enum-like infrastructure and will be rewritten once Chisel improves base Enum support. Currently, values are specified like `JtagState.TestLogicReset.U` or `JtagSTate.RunTestIdle.U`. See [src/main/scala/JtagStateMachine.scala](src/main/scala/JtagStateMachine.scala) for all the values.*
+  - Do NOT depend on any particular numeric encoding of states (use the enum abstraction) as this may be subject to change or optimization.
+- `instruction: UInt`: current active instruction, updated on the TCK falling edge (as per the spec). This may be useful for logic that depends on the current instruction, like boundary-scan's EXTEST instruction.
+- `reset: Bool`: high if the TAP is in the Test-Logic-Reset state. This should be used as the reset signal for any JTAG block logic, like captured registers.
   - *Note: until better clock-crossing support is implemented in Chisel, this must be done at a Module boundary*
 
 *As the structure of these signals are not completely defined by the spec, this API is subject to change.*
