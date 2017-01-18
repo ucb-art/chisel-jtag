@@ -4,7 +4,6 @@ package jtag
 
 import chisel3._
 import chisel3.util._
-
 /** JTAG signals, viewed from the master side
   */
 class JTAGIO extends Bundle {
@@ -26,7 +25,7 @@ class JtagOutput(irLength: Int) extends Bundle {
 }
 
 class JtagControl extends Bundle {
-  val fsmAsyncReset = Input(Bool())  // TODO: asynchronous reset for FSM, used for TAP_POR*
+  val fsmAsyncReset = Input(Bool())
 }
 
 /** Aggregate JTAG block IO.
@@ -79,13 +78,13 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   // 7.1.1d IR shifter two LSBs must be b01 pattern
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
   // 7.2.1a behavior of instruction register and shifters
-  val irShifter = Module(CaptureUpdateChain(UInt(irLength.W)))
-  irShifter.suggestName("irChain")
-  irShifter.io.chainIn.shift := currState === JtagState.ShiftIR.U
-  irShifter.io.chainIn.data := io.jtag.TDI
-  irShifter.io.chainIn.capture := currState === JtagState.CaptureIR.U
-  irShifter.io.chainIn.update := currState === JtagState.UpdateIR.U
-  irShifter.io.capture.bits := "b01".U
+  val irChain = Module(CaptureUpdateChain(UInt(irLength.W)))
+  irChain.suggestName("irChain")
+  irChain.io.chainIn.shift := currState === JtagState.ShiftIR.U
+  irChain.io.chainIn.data := io.jtag.TDI
+  irChain.io.chainIn.capture := currState === JtagState.CaptureIR.U
+  irChain.io.chainIn.update := currState === JtagState.UpdateIR.U
+  irChain.io.capture.bits := "b01".U
 
   val updateInstruction = Wire(Bool())
 
@@ -96,7 +95,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
     nextActiveInstruction := initialInstruction.U(irLength.W)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {
-    nextActiveInstruction := irShifter.io.update.bits
+    nextActiveInstruction := irChain.io.update.bits
     updateInstruction := true.B
   } .otherwise {
     updateInstruction := false.B
@@ -120,7 +119,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
     tdo := io.dataChainIn.data
     tdo_driven := true.B
   } .elsewhen (currState === JtagState.ShiftIR.U) {
-    tdo := irShifter.io.chainOut.data
+    tdo := irChain.io.chainOut.data
     tdo_driven := true.B
   } .otherwise {
     tdo_driven := false.B
@@ -156,15 +155,14 @@ object JtagTapGenerator {
     // Create IDCODE chain if needed
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
-        val idcodeModule = Module(CaptureChain(UInt(32.W)))
-        idcodeModule.suggestName("idcodeChain")
+        val idcodeChain = Module(CaptureChain(UInt(32.W)))
+        idcodeChain.suggestName("idcodeChain")
         require(idcode % 2 == 1, "LSB must be set in IDCODE, see 12.1.1d")
         require(((idcode >> 1) & ((1 << 11) - 1)) != JtagIdcode.dummyMfrId, "IDCODE must not have 0b00001111111 as manufacturer identity, see 12.2.1b")
         require(!(instructions contains icode), "instructions may not contain IDCODE")
-        idcodeModule.io.capture.bits := idcode.U(32.W)
-        instructions + (icode -> idcodeModule)
-      }
-      case None => instructions
+        idcodeChain.io.capture.bits := idcode.U(32.W)
+        instructions + (icode -> idcodeChain)
+      }      case None => instructions
     }
 
     val bypassIcode = (BigInt(1) << irLength) - 1  // required BYPASS instruction
