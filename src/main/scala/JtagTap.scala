@@ -5,14 +5,14 @@ package jtag
 import chisel3._
 import chisel3.util._
 
-/** JTAG signals, viewed from the device side.
+/** JTAG signals, viewed from the master side
   */
-class JtagIO extends Bundle {
-  val TRSTn  = Input(Bool()) // TRST is an active-low signal. Name it accordingly.
-  val TCK   = Input(Bool())
-  val TMS   = Input(Bool())
-  val TDI   = Input(Bool())
-  val TDO   = Output(new Tristate())
+class JTAGIO extends Bundle {
+  val TRSTn  = Output(Bool()) // TRST is an active-low signal. Name it accordingly.
+  val TCK   = Clock(OUTPUT)
+  val TMS   = Output(Bool())
+  val TDI   = Output(Bool())
+  val TDO   = Input(new Tristate())
 }
 
 /** JTAG block output signals.
@@ -32,7 +32,7 @@ class JtagControl extends Bundle {
 /** Aggregate JTAG block IO.
   */
 class JtagBlockIO(irLength: Int) extends Bundle {
-  val jtag = new JtagIO
+  val jtag = Flipped(new JTAGIO())
   val control = new JtagControl
   val output = new JtagOutput(irLength)
 
@@ -71,7 +71,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   stateMachine.io.tms := io.jtag.TMS
   val currState = stateMachine.io.currState
   io.output.state := stateMachine.io.currState
-  stateMachine.io.asyncReset := io.control.fsmAsyncReset
+  stateMachine.io.asyncReset := io.control.fsmAsyncReset | ~io.jtag.TRSTn
 
   //
   // Instruction Register

@@ -2,6 +2,7 @@
 
 package jtag
 
+import util.{AsyncResetRegVec}
 import chisel3._
 import chisel3.util._
 
@@ -81,7 +82,17 @@ class JtagStateMachine extends Module(override_reset=Some(false.B)) {
   val tms = Reg(Bool(), next=io.tms)  // 4.3.1a captured on TCK rising edge, 6.1.2.1b assumed changes on TCK falling edge
 
   val nextState = Wire(JtagState.State.chiselType())
-  val lastState = Reg(JtagState.State.chiselType(), init=JtagState.TestLogicReset.U, next=nextState)
+
+  val lastStateReg = Module (new AsyncResetRegVec(w = JtagState.State.width,
+    init = JtagState.State.toInt(JtagState.TestLogicReset)))
+
+  lastStateReg.clock := clock
+  lastStateReg.reset := io.asyncReset
+  lastStateReg.io.en    := Bool(true)
+  lastStateReg.io.d  := nextState
+  val lastState = lastStateReg.io.q
+
+
   io.currState := nextState
 
   switch (lastState) {
