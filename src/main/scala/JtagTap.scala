@@ -80,6 +80,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   // TODO: 7.1.1d allow design-specific IR bits, 7.1.1e (rec) should be a fixed pattern
   // 7.2.1a behavior of instruction register and shifters
   val irShifter = Module(CaptureUpdateChain(UInt(irLength.W)))
+  irShifter.suggestName("irChain")
   irShifter.io.chainIn.shift := currState === JtagState.ShiftIR.U
   irShifter.io.chainIn.data := io.jtag.TDI
   irShifter.io.chainIn.capture := currState === JtagState.CaptureIR.U
@@ -156,6 +157,7 @@ object JtagTapGenerator {
     val allInstructions = idcode match {
       case Some((icode, idcode)) => {
         val idcodeModule = Module(CaptureChain(UInt(32.W)))
+        idcodeModule.suggestName("idcodeChain")
         require(idcode % 2 == 1, "LSB must be set in IDCODE, see 12.1.1d")
         require(((idcode >> 1) & ((1 << 11) - 1)) != JtagIdcode.dummyMfrId, "IDCODE must not have 0b00001111111 as manufacturer identity, see 12.2.1b")
         require(!(instructions contains icode), "instructions may not contain IDCODE")
