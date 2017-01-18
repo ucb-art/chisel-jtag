@@ -50,11 +50,11 @@ class JtagRegisterTester(val c: JtagClocked[JtagRegisterModule]) extends JtagTes
   expect(c.io.reg, 0x00)
 }
 
-  class ModuleIO(irLength: Int) extends JtagBlockIO(irLength) {
-    val reg = Output(UInt(8.W))
+class ModuleIO(irLength: Int) extends JtagBlockIO(irLength) {
+  val reg = Output(UInt(8.W))
 
-    override def cloneType = new ModuleIO(irLength).asInstanceOf[this.type]
-  }
+  override def cloneType = new ModuleIO(irLength).asInstanceOf[this.type]
+}
 
 class JtagRegisterModule() extends JtagModule {
   val irLength = 4
@@ -67,7 +67,7 @@ class JtagRegisterModule() extends JtagModule {
     reg := chain.io.update.bits
   }
 
-  val controller = JtagTapGenerator(irLength, Map(chain -> 1))
+  val controller = JtagTapGenerator(irLength, Map(1 -> chain))
 
 
   val io = IO(new ModuleIO(irLength))
@@ -76,8 +76,69 @@ class JtagRegisterModule() extends JtagModule {
   io.reg := reg
 }
 
+class JtagDuplicateChainTester(val c: JtagClocked[JtagDuplicateChainModule]) extends JtagTester(c) {
+  import BinaryParse._
+
+  resetToIdle()
+  expect(c.io.reg, 42)  // reset sanity check
+  idleToIRShift()
+  irShift("0001".reverse, "??01".reverse)
+  irShiftToIdle()
+
+  idleToDRShift()
+  expect(c.io.reg, 42)
+  drShift("00101111", "00101010".reverse)
+  drShiftToIdle()
+  expect(c.io.reg, 0xF4)
+  idleToDRShift()
+  drShift("11111111", "00101111")
+  drShiftToIdle()
+  expect(c.io.reg, 0xFF)
+  idleToDRShift()
+  drShift("00000000", "11111111")
+  drShiftToIdle()
+  expect(c.io.reg, 0x00)
+
+  idleToIRShift()
+  irShift("0010".reverse, "??01".reverse)
+  irShiftToIdle()
+
+  idleToDRShift()
+  expect(c.io.reg, 0x00)
+  drShift("00101111", "00000000".reverse)
+  drShiftToIdle()
+  expect(c.io.reg, 0xF4)
+  idleToDRShift()
+  drShift("11111111", "00101111")
+  drShiftToIdle()
+  expect(c.io.reg, 0xFF)
+  idleToDRShift()
+  drShift("00000000", "11111111")
+  drShiftToIdle()
+  expect(c.io.reg, 0x00)
+}
+
+class JtagDuplicateChainModule() extends JtagModule {
+  val irLength = 4
+
+  val reg = Reg(UInt(8.W), init=42.U)
+
+  val chain = Module(CaptureUpdateChain(UInt(8.W)))
+  chain.io.capture.bits := reg
+  when (chain.io.update.valid) {
+    reg := chain.io.update.bits
+  }
+
+  val controller = JtagTapGenerator(irLength, Map(1 -> chain, 2-> chain))
+
+  val io = IO(new ModuleIO(irLength))
+  io.jtag <> controller.jtag
+  io.output <> controller.output
+  io.reg := reg
+}
+
 class JtagTapSpec extends ChiselFlatSpec {
-  "JTAG TAP should output a proper IDCODE" should "work" in {
+  "JTAG TAP" should "output a proper IDCODE" in {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
     Driver(() => JtagClocked(() => new JtagIdcodeModule(2, (0, JtagIdcode(0xA, 0x123, 0x42)))), backendType="verilator") {
       c => new JtagIdcodeTester(c)
@@ -87,6 +148,12 @@ class JtagTapSpec extends ChiselFlatSpec {
     //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
     Driver(() => JtagClocked(() => new JtagRegisterModule()), backendType="verilator") {
       c => new JtagRegisterTester(c)
+    } should be (true)
+  }
+  "JTAG TAP" should "allow multiple instructions to select the same chain for scan" in {
+    //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
+    Driver(() => JtagClocked(() => new JtagDuplicateChainModule()), backendType="verilator") {
+      c => new JtagDuplicateChainTester(c)
     } should be (true)
   }
 }

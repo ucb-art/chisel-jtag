@@ -241,7 +241,8 @@ object JtagClocked {
 }
 
 class BareJtagModule(irLength: Int) extends JtagModule {
-  val controller = JtagTapGenerator(irLength, Map())
+  // Explicitly create bypass chain instruction to ignore errors about no instructions
+  val controller = JtagTapGenerator(irLength, Map(0 -> Module(new JtagBypassChain)))
   val io = IO(controller.cloneType)
   io <> controller
 }

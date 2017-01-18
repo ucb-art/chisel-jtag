@@ -46,7 +46,7 @@ JtagTapGenerator instantiates a TAP controller block (returning its IO) and some
 
 The arguments are:
 - `irLength`: Int - length, in bits, of the instruction register.
-- `instructions`: Map[Chain, BigInt] - a Map of data registers (Chains) to the instruction code that selects them. Multiple instructions may select the same chains for scan, for example if the instructions have different state actions.
+- `instructions`: Map[BigInt, Chain] - a Map of instruction code to the data register (Chain) that is selected for scan. Multiple instructions may select the same chains for scan, for example if the instructions have different state actions.
 - `idcode`: Option[(BigInt, BigInt)] - optional IDCODE generator. A value of None means to not generate a IDCODE register (and BYPASS, with an instruction code of all ones, will be selected as the initial instruction), while a value of (instruction code, idcode) generates the 32-bit IDCODE register and selects its corresponding instruction code as the initial instruction.
 
 All unused instruction codes will select the BYPASS register.
@@ -82,6 +82,33 @@ when (myDataChain.io.update.valid) {
 val tap = JtagTapGenerator(2, Map(myDataChain -> 1))
 ```
 
+### Status
+The Bundle returned by the TAP generator provides an `output` field providing (possibly useful) TAP status. `output` contains these fields:
+- `state: JtagState`: current JTAG state, updated on the TCK rising edge.
+  - *Note: this uses nonstandard Enum-like infrastructure and will be rewritten once Chisel improves base Enum support. Currently, values are specified like `JtagState.TestLogicReset.U` or `JtagSTate.RunTestIdle.U`. See [src/main/scala/JtagStateMachine.scala](src/main/scala/JtagStateMachine.scala) for all the values.*
+  - Do NOT depend on any particular numeric encoding of states (use the enum abstraction) as this may be subject to change or optimization.
+- `instruction: UInt`: current active instruction, updated on the TCK falling edge (as per the spec). This may be useful for logic that depends on the current instruction, like boundary-scan's EXTEST instruction.
+- `reset: Bool`: high if the TAP is in the Test-Logic-Reset state. This should be used as the reset signal for any JTAG block logic, like captured registers.
+  - *Note: until better clock-crossing support is implemented in Chisel, this must be done at a Module boundary*
+
+*As the structure of these signals are not completely defined by the spec, this API is subject to change.*
+
+### Reset
+*This API has not been finalized and is subject to change pending Chisel asynchronous reset implementation and clock-crossing API improvements.*
+
+`JtagTapGenerator` takes its (synchronous) Module reset signal from its containing Module. This works as expected, except that FSM is not affected by this signal. This is a ugly hack to allow Test-Logic-Reset to reset user logic without holding the TAP perpetually in reset, and will be removed when TRST is implemented. The TAP may start in an unknown state, and should be set to a known state externally with 5 TMS=1 transitions.
+
+### Spec Compliance
+Some requirements of the JTAG Spec [IEEE Std 1149.1-2013 (paywall / subscription)](https://standards.ieee.org/findstds/standard/1149.1-2013.html) are outside the abstraction boundary provided by this generator and must be handled at a higher level. Detailed notes for spec compliance are included in the `JtagTapGenerator` ScalaDoc. Main points are:
+- TMS and TDI (inputs) must appear high when undriven.
+- TDO must be tri-state and undriven except when shifting data.
+- TAP controller must not be reset by system reset (but may share a power-on reset) .
+- Boundary scan must be implemented for formal spec compliance. This isn't implemented yet.
+
+Caveat emptor: no guarantees are made for formal spec compliance - these notes are provided on a best-effort basis. If you see anything wrong, please submit a pull request!
+
+Many optional sections of the spec (like test mode presistence or reset instructions) have not been implemented. They may be developed if there is a good case supporting one of the Berkeley chip projects, but feel free to implement it and submit a pull request. I'd be happy to discuss high level implementation strategy beforehand to make it more likely that a pull request will be accepted and merged.
+
 ### Misc Notes
 
 - There's a lot of elaboration-time error checking to prevent parameters that are contrary to the spec. For example, the generator will `require` out if attempting to set an IDCODE that conflicts with the JTAG spec's reserved dummy code.
@@ -89,7 +116,7 @@ val tap = JtagTapGenerator(2, Map(myDataChain -> 1))
   - Exception: boundary-scan is currently not implemented. Please don't file a bug for that, it will be implemented eventually.
 
 ### Package Structure
-No guarantees are made about the contents of the `examples` folder. In particular, do NOT depend on the contents of those (such as the async tools) in your designs.
+No guarantees are made about the structure and contents of the `examples` folder. In particular, do NOT depend on its contents(such as the async tools) in your designs.
 
 ## Hardware Verification
 This generator has been used in these designs:
@@ -100,7 +127,6 @@ Planned:
 
 ## More Debugging Modules
 Check out the [builtin-debuggers](https://github.com/ucb-art/builtin-debugger) repository, which contains generators for debugging blocks like a logic analyzer and pattern generator that you can instantiate on your chip or FPGA and connect it through JTAG.
-
 
 ## TODOs
 Some features are yet to be implemented:
