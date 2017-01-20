@@ -31,9 +31,10 @@ class NegativeEdgeLatch[T <: Data](clock: Clock, dataType: T)
 /** Generates a register that updates on the falling edge of the input clock signal.
   */
 object NegativeEdgeLatch {
-  def apply[T <: Data](clock: Clock, next: T, enable: Bool=true.B): T = {
+  def apply[T <: Data](clock: Clock, next: T, enable: Bool=true.B, name: Option[String] = None): T = {
     // TODO better init passing once in-module multiclock support improves
     val latch_module = Module(new NegativeEdgeLatch((!clock.asUInt).asClock, next.cloneType))
+    name.foreach(latch_module.suggestName(_))
     latch_module.io.next := next
     latch_module.io.enable := enable
     latch_module.io.output

@@ -25,7 +25,7 @@ class JtagOutput(irLength: Int) extends Bundle {
 }
 
 class JtagControl extends Bundle {
-  val fsmAsyncReset = Input(Bool())
+  val jtagPOReset = Input(Bool())
 }
 
 /** Aggregate JTAG block IO.
@@ -60,8 +60,8 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
   val tdo_driven = Wire(Bool())
-  io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo)  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
-  io.jtag.TDO.driven := NegativeEdgeLatch(clock, tdo_driven)
+  io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo, name = Some("tdoReg"))  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
+  io.jtag.TDO.driven := NegativeEdgeLatch(clock, tdo_driven, name = Some("tdoeReg"))
 
   //
   // JTAG state machine
@@ -70,7 +70,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   stateMachine.io.tms := io.jtag.TMS
   val currState = stateMachine.io.currState
   io.output.state := stateMachine.io.currState
-  stateMachine.io.asyncReset := io.control.fsmAsyncReset | ~io.jtag.TRSTn
+  stateMachine.io.asyncReset := io.control.jtagPOReset | ~io.jtag.TRSTn
 
   //
   // Instruction Register
@@ -89,7 +89,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   val updateInstruction = Wire(Bool())
 
   val nextActiveInstruction = Wire(UInt(irLength.W))
-  val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
+  val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction, name = Some("irReg"))   // 7.2.1d active instruction output latches on TCK falling edge
 
   when (reset) {
     nextActiveInstruction := initialInstruction.U(irLength.W)
