@@ -88,7 +88,7 @@ class JtagStateMachine extends Module(override_reset=Some(false.B)) {
 
   lastStateReg.clock := clock
   lastStateReg.reset := io.asyncReset
-  lastStateReg.io.en    := Bool(true)
+  lastStateReg.io.en := true.B
   lastStateReg.io.d  := nextState
   val lastState = lastStateReg.io.q
 
