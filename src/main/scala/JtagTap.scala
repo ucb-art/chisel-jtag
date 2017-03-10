@@ -6,12 +6,14 @@ import chisel3._
 import chisel3.util._
 /** JTAG signals, viewed from the master side
   */
-class JTAGIO extends Bundle {
-  val TRSTn  = Output(Bool()) // TRST is an active-low signal. Name it accordingly.
+class JTAGIO(hasTRSTn: Boolean = false) extends Bundle {
+  val TRSTn = if (hasTRSTn) Some(Output(Bool())) else None
   val TCK   = Clock(OUTPUT)
   val TMS   = Output(Bool())
   val TDI   = Output(Bool())
   val TDO   = Input(new Tristate())
+
+  override def cloneType = new JTAGIO(hasTRSTn).asInstanceOf[this.type]
 }
 
 /** JTAG block output signals.
@@ -25,7 +27,7 @@ class JtagOutput(irLength: Int) extends Bundle {
 }
 
 class JtagControl extends Bundle {
-  val jtagPOReset = Input(Bool())
+  val jtckPOReset = Input(Bool())
 }
 
 /** Aggregate JTAG block IO.
@@ -70,7 +72,12 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   stateMachine.io.tms := io.jtag.TMS
   val currState = stateMachine.io.currState
   io.output.state := stateMachine.io.currState
-  stateMachine.io.asyncReset := io.control.jtagPOReset | ~io.jtag.TRSTn
+
+  // At this point, the TRSTn should already have been
+  // combined with any POR, and it should also be
+  // synchronized to TCK.
+  require(!io.jtag.TRSTn.isDefined, "TRSTn should be absorbed into jtckPOReset outside of JtagTapController.")
+  stateMachine.io.asyncReset := io.control.jtckPOReset
 
   //
   // Instruction Register
