@@ -62,7 +62,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
   val tdo_driven = Wire(Bool())
-  io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo, name = Some("tdoReg"))  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
+  io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo, name = Some("tdoReg"))  // 4.5.1a TDO changes on falling edge of TCK, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
   io.jtag.TDO.driven := NegativeEdgeLatch(clock, tdo_driven, name = Some("tdoeReg"))
 
   //
