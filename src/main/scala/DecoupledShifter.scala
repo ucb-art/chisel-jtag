@@ -7,8 +7,7 @@ import chisel3.util._
 
 /** JTAG shifter chain that acts as a source for an internal Decoupled. gen is the type of the
   * Decoupled, without the Decoupled. The output Decoupled must be on the same clock as the JTAG
-  * TAP. The output Decoupled must never revoke a ready status (otherwise, add a one-element
-  * queue).
+  * TAP and must never revoke a ready status (otherwise, add a queue).
   *
   * The scan chain input consists of a valid bit (MSbit) followed by the bits of gen (LSbits).
   * The scan chain output consists of just the ready bit.
@@ -52,4 +51,12 @@ class DecoupledSourceChain[+T <: Data](gen: T) extends Chain {
   } .otherwise {
     io.interface.valid := false.B
   }
+}
+
+/** JTAG shifter chain that acts as a sink for an internal Decoupled. gen is the type of the
+  * Decoupled, without the Decoupled. The input Decoupled must be on the same clock as the JTAG
+  * TAP and must never revoke valid or change data once valid (otherwise, add a queue).
+  */
+class DecoupledSinkChain[+T <: Data](gen: T) extends Chain {
+
 }
