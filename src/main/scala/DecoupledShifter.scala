@@ -56,7 +56,42 @@ class DecoupledSourceChain[+T <: Data](gen: T) extends Chain {
 /** JTAG shifter chain that acts as a sink for an internal Decoupled. gen is the type of the
   * Decoupled, without the Decoupled. The input Decoupled must be on the same clock as the JTAG
   * TAP and must never revoke valid or change data once valid (otherwise, add a queue).
+  *
+  * The scan chain input consists of just the ready bit.
+  * The scan chain output consists of a valid bit (MSbit) followed by the bits of gen (LSbits).
+  *
+  * During the Capture state, the valid bit and data from the external interface are latched into
+  * the scan chain.
+  * During the Update state, the scanned-in ready bit is gated with the registered valid bit
   */
 class DecoupledSinkChain[+T <: Data](gen: T) extends Chain {
+  class ModIO extends ChainIO {
+    val interface = Flipped(Decoupled(gen))
+  }
+  val io = IO(new ModIO)
 
+  class CaptureType extends Bundle {
+    val valid = Bool()  // MSbit
+    val bits = gen.chiselCloneType  // LSbits
+    override def cloneType: this.type = (new CaptureType).asInstanceOf[this.type]
+  }
+
+  val chain = Module(CaptureUpdateChain(new CaptureType, Bool()))
+  chain.io.chainIn := io.chainIn
+  io.chainOut := chain.io.chainOut
+
+  chain.io.capture.bits.valid := io.interface.valid
+  chain.io.capture.bits.bits := io.interface.bits
+  
+  val validReg = Reg(Bool())
+  when (chain.io.capture.capture) {
+    validReg := io.interface.valid
+  }
+  
+  when (chain.io.update.valid) {
+    io.interface.ready := validReg && chain.io.update.bits
+    assert(io.interface.valid === validReg)
+  } .otherwise {
+    io.interface.ready := false.B
+  }
 }
