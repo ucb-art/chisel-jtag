@@ -2,7 +2,7 @@
 
 package jtag.test
 
-import Chisel.iotesters.{PeekPokeTester}
+import chisel3.iotesters.experimental.ImplicitPokeTester
 
 import chisel3._
 import jtag._
@@ -21,7 +21,7 @@ object BinaryParse {
 
 /** Test helper for working with Tristate Bundles and allowing Xs in expects.
   */
-trait TristateTestUtility extends PeekPokeTester[chisel3.Module] {
+trait TristateTestUtility extends ImplicitPokeTester {
   import scala.language.implicitConversions
 
   trait TristateValue
@@ -37,28 +37,28 @@ trait TristateTestUtility extends PeekPokeTester[chisel3.Module] {
     }
   }
 
-  def expect(node: Tristate, value: TristateValue, msg: String) {
+  def check(node: Tristate, value: TristateValue, msg: String)(implicit t: InnerTester) {
     value match {
       case TristateLow => {
-        expect(node.driven, 1, s"$msg: expected tristate driven=1")
-        expect(node.data, 0, s"$msg: expected tristate data=0")
+        check(node.driven, 1, s"$msg: expected tristate driven=1")
+        check(node.data, 0, s"$msg: expected tristate data=0")
       }
       case TristateHigh => {
-        expect(node.driven, 1, s"$msg: expected tristate driven=1")
-        expect(node.data, 1, s"$msg: expected tristate data=1")
+        check(node.driven, 1, s"$msg: expected tristate driven=1")
+        check(node.data, 1, s"$msg: expected tristate data=1")
       }
       case Z => {
-        expect(node.driven, 0, s"$msg: expected tristate driven=0")
+        check(node.driven, 0, s"$msg: expected tristate driven=0")
       }
       case X =>
     }
   }
 
-  def poke(node: Bool, value: TristateValue) {
+  def poke(node: Bool, value: TristateValue)(implicit t: InnerTester) {
     value match {
-      case TristateLow => poke(node, 0)
-      case TristateHigh => poke(node, 1)
-      case X => poke(node, 0)
+      case TristateLow => t.poke(node, 0)
+      case TristateHigh => t.poke(node, 1)
+      case X => t.poke(node, 0)
     }
   }
 }

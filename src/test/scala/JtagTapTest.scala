@@ -2,15 +2,14 @@
 
 package jtag.test
 
-import Chisel.iotesters.{ChiselFlatSpec, Driver, PeekPokeTester}
+import org.scalatest._
+
+import chisel3.iotesters.experimental.{ImplicitPokeTester, VerilatorBackend}
 
 import chisel3._
 import jtag._
 
-trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTestUtility {
-  val jtag: JtagIO
-  val output: JtagOutput
-
+trait JtagTestUtilities extends ImplicitPokeTester with TristateTestUtility {
   var expectedInstruction: Option[Int] = None  // expected instruction output after TCK low
 
   /** Convenience function for stepping a JTAG cycle (TCK high -> low -> high) and checking basic
@@ -21,83 +20,83 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     * @param tdi TDI to set after the clock low
     * @param expectedTdo expected TDO after the clock low
     */
-  def jtagCycle(tms: Int, expectedState: JtagState.State, tdi: TristateValue = X,
-      expectedTdo: TristateValue = Z, msg: String = "") {
-    expect(jtag.TCK, 1, "TCK must start at 1")
-    val prevState = peek(output.state)
+  def jtagCycle(io: JtagBlockIO, tms: Int, expectedState: JtagState.State, tdi: TristateValue = X,
+      expectedTdo: TristateValue = Z, msg: String = "")(implicit t: InnerTester) {
+    check(io.jtag.TCK, 1, "TCK must start at 1")
+    check(io.output.state, expectedState, s"$msg: expected state $expectedState")
 
-    expect(output.state, expectedState, s"$msg: expected state $expectedState")
-
-    poke(jtag.TCK, 0)
+    poke(io.jtag.TCK, 0)
     step(1)
-    expect(output.state, expectedState, s"$msg: expected state $expectedState")
+    check(io.output.state, expectedState, s"$msg: expected state $expectedState")
 
-    poke(jtag.TMS, tms)
-    poke(jtag.TDI, tdi)
-    expect(jtag.TDO, expectedTdo, s"$msg: TDO")
+    poke(io.jtag.TMS, tms)
+    poke(io.jtag.TDI, tdi)
+    check(io.jtag.TDO, expectedTdo, s"$msg: TDO")
     expectedInstruction match {
-      case Some(instruction) => expect(output.instruction, instruction, s"$msg: expected instruction $instruction")
+      case Some(instruction) =>
+        check(io.output.instruction, instruction, s"$msg: expected instruction $instruction")
       case None =>
     }
 
-    poke(jtag.TCK, 1)
+    poke(io.jtag.TCK, 1)
     step(1)
-    expect(jtag.TDO, expectedTdo, s"$msg: TDO")
+    check(io.jtag.TDO, expectedTdo, s"$msg: TDO")
   }
 
   /** After every TCK falling edge following this call, expect this instruction on the status line.
     * None means to not check the instruction output.
     */
+  // TODO: GET RID OF THIS, BETTER WAY TO CAPTURE STATE
   def expectInstruction(expected: Option[Int]) {
     expectedInstruction = expected
   }
 
   /** Resets the test block using 5 TMS transitions.
     */
-  def tmsReset() {
-    poke(jtag.TMS, 1)
-    poke(jtag.TCK, 1)
+  def tmsReset(io: JtagBlockIO)(implicit t: InnerTester) {
+    poke(io.jtag.TMS, 1)
+    poke(io.jtag.TCK, 1)
     step(1)
     for (_ <- 0 until 5) {
-      poke(jtag.TCK, 0)
+      poke(io.jtag.TCK, 0)
       step(1)
-      poke(jtag.TCK, 1)
+      poke(io.jtag.TCK, 1)
       step(1)
     }
-    expect(output.state, JtagState.TestLogicReset, "TMS reset: expected in reset state")
+    check(io.output.state, JtagState.TestLogicReset, "TMS reset: expected in reset state")
   }
 
-  def resetToIdle() {
-    tmsReset()
-    jtagCycle(0, JtagState.TestLogicReset)
-    expect(output.state, JtagState.RunTestIdle)
+  def resetToIdle(io: JtagBlockIO)(implicit t: InnerTester) {
+    tmsReset(io)
+    jtagCycle(io, 0, JtagState.TestLogicReset)
+    check(io.output.state, JtagState.RunTestIdle)
   }
 
-  def idleToDRShift() {
-    jtagCycle(1, JtagState.RunTestIdle)
-    jtagCycle(0, JtagState.SelectDRScan)
-    jtagCycle(0, JtagState.CaptureDR)
-    expect(output.state, JtagState.ShiftDR)
+  def idleToDRShift(io: JtagBlockIO)(implicit t: InnerTester) {
+    jtagCycle(io, 1, JtagState.RunTestIdle)
+    jtagCycle(io, 0, JtagState.SelectDRScan)
+    jtagCycle(io, 0, JtagState.CaptureDR)
+    check(io.output.state, JtagState.ShiftDR)
   }
 
-  def idleToIRShift() {
-    jtagCycle(1, JtagState.RunTestIdle)
-    jtagCycle(1, JtagState.SelectDRScan)
-    jtagCycle(0, JtagState.SelectIRScan)
-    jtagCycle(0, JtagState.CaptureIR)
-    expect(output.state, JtagState.ShiftIR)
+  def idleToIRShift(io: JtagBlockIO)(implicit t: InnerTester) {
+    jtagCycle(io, 1, JtagState.RunTestIdle)
+    jtagCycle(io, 1, JtagState.SelectDRScan)
+    jtagCycle(io, 0, JtagState.SelectIRScan)
+    jtagCycle(io, 0, JtagState.CaptureIR)
+    check(io.output.state, JtagState.ShiftIR)
   }
 
-  def drShiftToIdle() {
-    jtagCycle(1, JtagState.Exit1DR)
-    jtagCycle(0, JtagState.UpdateDR)
-    expect(output.state, JtagState.RunTestIdle)
+  def drShiftToIdle(io: JtagBlockIO)(implicit t: InnerTester) {
+    jtagCycle(io, 1, JtagState.Exit1DR)
+    jtagCycle(io, 0, JtagState.UpdateDR)
+    check(io.output.state, JtagState.RunTestIdle)
   }
 
-  def irShiftToIdle() {
-    jtagCycle(1, JtagState.Exit1IR)
-    jtagCycle(0, JtagState.UpdateIR)
-    expect(output.state, JtagState.RunTestIdle)
+  def irShiftToIdle(io: JtagBlockIO)(implicit t: InnerTester) {
+    jtagCycle(io, 1, JtagState.Exit1IR)
+    jtagCycle(io, 0, JtagState.UpdateIR)
+    check(io.output.state, JtagState.RunTestIdle)
   }
 
   /** Shifts data into the TDI register and checks TDO against expected data. Must start in the
@@ -108,7 +107,8 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     * first. This is in waveform display order and LSB-first order (so when specifying a number in
     * the usual MSB-first order, the string needs to be reversed).
     */
-  def shift(tdi: String, expectedTdo: String, expectedState: JtagState.State, expectedNextState: JtagState.State) {
+  def shift(io: JtagBlockIO, tdi: String, expectedTdo: String, expectedState: JtagState.State, expectedNextState: JtagState.State)
+  (implicit t: InnerTester) {
     def charToTristate(x: Char): TristateValue = x match {
       case '0' => 0
       case '1' => 1
@@ -122,99 +122,28 @@ trait JtagTestUtilities extends PeekPokeTester[chisel3.Module] with TristateTest
     val zipBits = tdiBits zip expectedTdoBits
 
     for ((tdiBit, expectedTdoBit) <- zipBits.init) {
-      jtagCycle(0, expectedState, tdi=tdiBit, expectedTdo=expectedTdoBit)
+      jtagCycle(io, 0, expectedState, tdi=tdiBit, expectedTdo=expectedTdoBit)
     }
     val (tdiLastBit, expectedTdoLastBit) = zipBits.last
-    jtagCycle(1, expectedState, tdi=tdiLastBit, expectedTdo=expectedTdoLastBit)
+    jtagCycle(io, 1, expectedState, tdi=tdiLastBit, expectedTdo=expectedTdoLastBit)
 
-    expect(output.state, expectedNextState)
+    check(io.output.state, expectedNextState)
   }
 
-  def drShift(tdi: String, expectedTdo: String) {
-    shift(tdi, expectedTdo, JtagState.ShiftDR, JtagState.Exit1DR)
+  def drShift(io: JtagBlockIO, tdi: String, expectedTdo: String)(implicit t: InnerTester) {
+    shift(io, tdi, expectedTdo, JtagState.ShiftDR, JtagState.Exit1DR)
   }
 
-  def irShift(tdi: String, expectedTdo: String) {
-    shift(tdi, expectedTdo, JtagState.ShiftIR, JtagState.Exit1IR)
+  def irShift(io: JtagBlockIO, tdi: String, expectedTdo: String)(implicit t: InnerTester) {
+    shift(io, tdi, expectedTdo, JtagState.ShiftIR, JtagState.Exit1IR)
   }
-}
-
-class JtagTester[T <: JtagModule](c: JtagClocked[T]) extends PeekPokeTester(c) with JtagTestUtilities {
-  val jtag = c.io.jtag
-  val output = c.io.output
-}
-
-class JtagTapTester(val c: JtagClocked[BareJtagModule]) extends JtagTester(c) {
-  import BinaryParse._
-
-  tmsReset()
-  expectInstruction(Some("11".b))
-  // Test sequence in Figure 6-3 (instruction scan), starting with the half-cycle off-screen
-  jtagCycle(1, JtagState.TestLogicReset)
-  jtagCycle(0, JtagState.TestLogicReset)
-  jtagCycle(1, JtagState.RunTestIdle)
-  jtagCycle(1, JtagState.SelectDRScan)
-  jtagCycle(0, JtagState.SelectIRScan)
-  jtagCycle(0, JtagState.CaptureIR)
-  jtagCycle(0, JtagState.ShiftIR, tdi=0, expectedTdo=1)  // first two required IR capture bits
-  jtagCycle(1, JtagState.ShiftIR, tdi=0, expectedTdo=0)
-  jtagCycle(0, JtagState.Exit1IR)
-  jtagCycle(0, JtagState.PauseIR)
-  jtagCycle(0, JtagState.PauseIR)
-  jtagCycle(1, JtagState.PauseIR)
-  jtagCycle(0, JtagState.Exit2IR)
-  jtagCycle(0, JtagState.ShiftIR, tdi=1, expectedTdo=0)
-  jtagCycle(0, JtagState.ShiftIR, tdi=1, expectedTdo=0)
-  jtagCycle(0, JtagState.ShiftIR, tdi=0, expectedTdo=1)
-  jtagCycle(1, JtagState.ShiftIR, tdi=1, expectedTdo=1)
-  jtagCycle(1, JtagState.Exit1IR)
-  expectInstruction(Some("10".b))
-  jtagCycle(0, JtagState.UpdateIR)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-
-  tmsReset()
-  expectInstruction(Some("11".b))
-  jtagCycle(0, JtagState.TestLogicReset)
-  // Test sequence in Figure 6-4 (data scan), starting with the half-cycle off-screen
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(1, JtagState.RunTestIdle)
-  jtagCycle(0, JtagState.SelectDRScan)
-  jtagCycle(0, JtagState.CaptureDR)
-  jtagCycle(0, JtagState.ShiftDR, tdi=1, expectedTdo=0)  // required bypass capture bit
-  jtagCycle(0, JtagState.ShiftDR, tdi=0, expectedTdo=1)
-  jtagCycle(1, JtagState.ShiftDR, tdi=1, expectedTdo=0)
-  jtagCycle(0, JtagState.Exit1DR)
-  jtagCycle(0, JtagState.PauseDR)
-  jtagCycle(0, JtagState.PauseDR)
-  jtagCycle(1, JtagState.PauseDR)
-  jtagCycle(0, JtagState.Exit2DR)
-  jtagCycle(0, JtagState.ShiftDR, tdi=1, expectedTdo=1)
-  jtagCycle(0, JtagState.ShiftDR, tdi=1, expectedTdo=1)
-  jtagCycle(0, JtagState.ShiftDR, tdi=0, expectedTdo=1)
-  jtagCycle(1, JtagState.ShiftDR, tdi=0, expectedTdo=0)
-  jtagCycle(1, JtagState.Exit1DR)
-  jtagCycle(0, JtagState.UpdateDR)
-  jtagCycle(0, JtagState.RunTestIdle)
-  jtagCycle(1, JtagState.RunTestIdle)
-  jtagCycle(1, JtagState.SelectDRScan)  // Fig 6-4 says "Select-IR-Scan", seems like a typo
-  jtagCycle(1, JtagState.SelectIRScan)
-  jtagCycle(1, JtagState.TestLogicReset)
-  jtagCycle(1, JtagState.TestLogicReset)
-  jtagCycle(1, JtagState.TestLogicReset)
 }
 
 trait JtagModule extends Module {
   val io: JtagBlockIO
 }
 
-class JtagClocked[T <: JtagModule](gen: ()=>T) extends Module {
+class JtagClocked[T <: JtagModule](name: String, gen: ()=>T) extends Module {
   class Reclocked(modClock: Clock, modReset: Bool)
       extends Module(override_clock=Some(modClock), override_reset=Some(modReset)) {
     val mod = Module(gen())
@@ -232,26 +161,87 @@ class JtagClocked[T <: JtagModule](gen: ()=>T) extends Module {
   innerReset := clockMod.io.output.reset
 
   clockMod.io.control.fsmAsyncReset := false.B
+  
+  override def desiredName = name  // TODO needed to not break verilator because of name aliasing
 }
 
 object JtagClocked {
-  def apply[T <: JtagModule](gen: ()=>T): JtagClocked[T] = {
-    new JtagClocked(gen)
+  def apply[T <: JtagModule](name: String, gen: ()=>T): JtagClocked[T] = {
+    new JtagClocked(name, gen)
   }
 }
 
-class BareJtagModule(irLength: Int) extends JtagModule {
-  // Explicitly create bypass chain instruction to ignore errors about no instructions
-  val controller = JtagTapGenerator(irLength, Map(0 -> Module(new JtagBypassChain)))
-  val io = IO(controller.cloneType)
-  io <> controller
-}
-
-class JtagTapExampleWaveformSpec extends ChiselFlatSpec {
+class JtagTapExampleWaveformSpec extends FlatSpec with JtagTestUtilities {
   "JTAG TAP with example waveforms from the spec" should "work" in {
-    //Driver(() => new JtagTap(2)) {  // multiclock doesn't work here yet
-    Driver(() => JtagClocked(() => new BareJtagModule(2)), backendType="verilator") {
-      c => new JtagTapTester(c)
-    } should be (true)
+    test(JtagClocked("exampleWaveforms", () => new JtagModule {
+      // Explicitly create bypass chain instruction to ignore errors about no instructions
+      val controller = JtagTapGenerator(2, Map(0 -> Module(new JtagBypassChain)))
+      val io = IO(controller.cloneType)
+      io <> controller
+    }), testerBackend=VerilatorBackend) { implicit t => c =>
+      import BinaryParse._
+    
+      tmsReset(c.io)
+      expectInstruction(Some("11".b))
+      // Test sequence in Figure 6-3 (instruction scan), starting with the half-cycle off-screen
+      jtagCycle(c.io, 1, JtagState.TestLogicReset)
+      jtagCycle(c.io, 0, JtagState.TestLogicReset)
+      jtagCycle(c.io, 1, JtagState.RunTestIdle)
+      jtagCycle(c.io, 1, JtagState.SelectDRScan)
+      jtagCycle(c.io, 0, JtagState.SelectIRScan)
+      jtagCycle(c.io, 0, JtagState.CaptureIR)
+      jtagCycle(c.io, 0, JtagState.ShiftIR, tdi=0, expectedTdo=1)  // first two required IR capture bits
+      jtagCycle(c.io, 1, JtagState.ShiftIR, tdi=0, expectedTdo=0)
+      jtagCycle(c.io, 0, JtagState.Exit1IR)
+      jtagCycle(c.io, 0, JtagState.PauseIR)
+      jtagCycle(c.io, 0, JtagState.PauseIR)
+      jtagCycle(c.io, 1, JtagState.PauseIR)
+      jtagCycle(c.io, 0, JtagState.Exit2IR)
+      jtagCycle(c.io, 0, JtagState.ShiftIR, tdi=1, expectedTdo=0)
+      jtagCycle(c.io, 0, JtagState.ShiftIR, tdi=1, expectedTdo=0)
+      jtagCycle(c.io, 0, JtagState.ShiftIR, tdi=0, expectedTdo=1)
+      jtagCycle(c.io, 1, JtagState.ShiftIR, tdi=1, expectedTdo=1)
+      jtagCycle(c.io, 1, JtagState.Exit1IR)
+      expectInstruction(Some("10".b))
+      jtagCycle(c.io, 0, JtagState.UpdateIR)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+    
+      tmsReset(c.io)
+      expectInstruction(Some("11".b))
+      jtagCycle(c.io, 0, JtagState.TestLogicReset)
+      // Test sequence in Figure 6-4 (data scan), starting with the half-cycle off-screen
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 1, JtagState.RunTestIdle)
+      jtagCycle(c.io, 0, JtagState.SelectDRScan)
+      jtagCycle(c.io, 0, JtagState.CaptureDR)
+      jtagCycle(c.io, 0, JtagState.ShiftDR, tdi=1, expectedTdo=0)  // required bypass capture bit
+      jtagCycle(c.io, 0, JtagState.ShiftDR, tdi=0, expectedTdo=1)
+      jtagCycle(c.io, 1, JtagState.ShiftDR, tdi=1, expectedTdo=0)
+      jtagCycle(c.io, 0, JtagState.Exit1DR)
+      jtagCycle(c.io, 0, JtagState.PauseDR)
+      jtagCycle(c.io, 0, JtagState.PauseDR)
+      jtagCycle(c.io, 1, JtagState.PauseDR)
+      jtagCycle(c.io, 0, JtagState.Exit2DR)
+      jtagCycle(c.io, 0, JtagState.ShiftDR, tdi=1, expectedTdo=1)
+      jtagCycle(c.io, 0, JtagState.ShiftDR, tdi=1, expectedTdo=1)
+      jtagCycle(c.io, 0, JtagState.ShiftDR, tdi=0, expectedTdo=1)
+      jtagCycle(c.io, 1, JtagState.ShiftDR, tdi=0, expectedTdo=0)
+      jtagCycle(c.io, 1, JtagState.Exit1DR)
+      jtagCycle(c.io, 0, JtagState.UpdateDR)
+      jtagCycle(c.io, 0, JtagState.RunTestIdle)
+      jtagCycle(c.io, 1, JtagState.RunTestIdle)
+      jtagCycle(c.io, 1, JtagState.SelectDRScan)  // Fig 6-4 says "Select-IR-Scan", seems like a typo
+      jtagCycle(c.io, 1, JtagState.SelectIRScan)
+      jtagCycle(c.io, 1, JtagState.TestLogicReset)
+      jtagCycle(c.io, 1, JtagState.TestLogicReset)
+      jtagCycle(c.io, 1, JtagState.TestLogicReset)
+    }
   }
 }

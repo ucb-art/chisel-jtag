@@ -32,41 +32,13 @@ class DecoupledShifterSpec extends FlatSpec with ChainIOUtils {
       shift(c.io, 0, 1)
       check(c.io.interface.valid, false)
       step()
-      shift(c.io, 0, 1)
-      check(c.io.interface.valid, false)
-      step()
-      shift(c.io, 0, 1)  // capture MSB, update MSB - (empty), valid
+      shift(c.io, 0, 1)  // capture MSB, update MSB - (empty), bits
       check(c.io.interface.valid, false)
       step()
 
       update(c.io)
-      check(c.io.interface.valid, true)
       check(c.io.interface.bits, "1101".b)
-
-      // test capture-update with interface ready but valid request false
-      poke(c.io.interface.ready, true)
-      capture(c.io)
-      check(c.io.interface.valid, false)
-      step()
-
-      shift(c.io, 1, 1)  // capture LSB, update LSB - ready, bits
-      check(c.io.interface.valid, false)
-      step()
-      shift(c.io, 0, 0)
-      check(c.io.interface.valid, false)
-      step()
-      shift(c.io, 0, 1)
-      check(c.io.interface.valid, false)
-      step()
-      shift(c.io, 0, 1)
-      check(c.io.interface.valid, false)
-      step()
-      shift(c.io, 0, 0)  // capture MSB, update MSB - (empty), valid
-      check(c.io.interface.valid, false)
-      step()
-
-      update(c.io)
-      check(c.io.interface.valid, false)
+      check(c.io.interface.valid, true)
 
       // test capture-update with interface not ready
       poke(c.io.interface.ready, false)
@@ -83,10 +55,7 @@ class DecoupledShifterSpec extends FlatSpec with ChainIOUtils {
       shift(c.io, 0, 1)
       check(c.io.interface.valid, false)
       step()
-      shift(c.io, 0, 1)
-      check(c.io.interface.valid, false)
-      step()
-      shift(c.io, 0, 1)  // capture MSB, update MSB - (empty), valid
+      shift(c.io, 0, 1)  // capture MSB, update MSB - (empty), bits
       check(c.io.interface.valid, false)
       step()
 
@@ -104,36 +73,10 @@ class DecoupledShifterSpec extends FlatSpec with ChainIOUtils {
       poke(c.io.interface.valid, true)
       poke(c.io.interface.bits, "1101".b)
       capture(c.io)
-      check(c.io.interface.ready, false)
-      step()
-
-      shift(c.io, 1, 1)  // capture LSB, update LSB - bits, ready
-      check(c.io.interface.ready, false)
-      step()
-      shift(c.io, 0, 0)
-      check(c.io.interface.ready, false)
-      step()
-      shift(c.io, 1, 0)
-      check(c.io.interface.ready, false)
-      step()
-      shift(c.io, 1, 0)
-      check(c.io.interface.ready, false)
-      step()
-      shift(c.io, 1, 0)  // capture MSB, update MSB - valid, (empty)
-      check(c.io.interface.ready, false)
-      step()
-
-      update(c.io)
       check(c.io.interface.ready, true)
-
-      // test capture-update with interface valid but request invalid (peeking)
-      poke(c.io.interface.valid, true)
-      poke(c.io.interface.bits, "1101".b)
-      capture(c.io)
-      check(c.io.interface.ready, false)
       step()
 
-      shift(c.io, 1, 0)  // capture LSB, update LSB - bits, ready
+      shift(c.io, 1, 0)  // capture LSB, update LSB - bits, (empty)
       check(c.io.interface.ready, false)
       step()
       shift(c.io, 0, 0)
@@ -155,10 +98,10 @@ class DecoupledShifterSpec extends FlatSpec with ChainIOUtils {
       // test capture-update with interface not ready
       poke(c.io.interface.valid, false)
       capture(c.io)
-      check(c.io.interface.ready, false)
+      check(c.io.interface.ready, true)
       step()
 
-      shift(c.io, 1, 1)  // capture LSB, update LSB - bits, ready
+      shift(c.io, 1, 0)  // capture LSB, update LSB - bits, (empty)
       check(c.io.interface.ready, false)
       step()
       shift(c.io, 0, 0)
