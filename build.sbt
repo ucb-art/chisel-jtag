@@ -2,6 +2,8 @@ name := "chisel-jtag"
 
 version := "0"
 
+organization := "edu.berkeley.cs"
+
 scalaVersion := "2.11.7"
 
 scalacOptions := Seq("-deprecation", "-feature")
