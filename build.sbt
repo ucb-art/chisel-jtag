@@ -1,12 +1,12 @@
 name := "chisel-jtag"
 
-version := "0"
+version := "0.1"
 
 organization := "edu.berkeley.cs"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.12.10"
 
-scalacOptions := Seq("-deprecation", "-feature")
+scalacOptions := Seq("-deprecation", "-feature", "-Xsource:2.11")
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),
@@ -15,11 +15,15 @@ resolvers ++= Seq(
 
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 val defaultVersions = Map(
-  "chisel3" -> "3.1-SNAPSHOT",
-  "chisel-iotesters" -> "1.2-SNAPSHOT"
+//  "chisel3" -> "3.3-SNAPSHOT",
+  "chisel-iotesters" -> "1.4-SNAPSHOT",
+  "chiseltest" -> "0.2-SNAPSHOT"
 )
 
-libraryDependencies ++= (Seq("chisel3","chisel-iotesters").map {
+// enables using control-c in sbt CLI
+cancelable in Global := true
+
+libraryDependencies ++= (Seq("chiseltest","chisel-iotesters").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep))
 })
 

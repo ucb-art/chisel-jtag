@@ -3,7 +3,6 @@
 package jtag
 
 import chisel3._
-import chisel3.util._
 
 /** JTAG signals, viewed from the device side.
   */
@@ -91,7 +90,7 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   val nextActiveInstruction = Wire(UInt(irLength.W))
   val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
 
-  when (reset) {
+  when (reset.asBool) {
     nextActiveInstruction := initialInstruction.U(irLength.W)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {

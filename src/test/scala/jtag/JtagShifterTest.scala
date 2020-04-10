@@ -1,6 +1,6 @@
 // See LICENSE for license details.
 
-package jtag.test
+package jtag
 
 import org.scalatest._
 

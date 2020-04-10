@@ -1,6 +1,6 @@
 // See LICENSE for license details.
 
-package jtag.test
+package jtag
 
 import org.scalatest._
 
@@ -18,13 +18,15 @@ class NegativeEdgeLatchTestModule[T <: Data](dataType: T) extends Module {
     val clock = Input(Bool())
   }
 
-  class Inner(mod_clock: Clock) extends Module(override_clock=Some(mod_clock)) {
+  class Inner extends Module {
     val io = IO(new ModIO)
     io.out := NegativeEdgeLatch(clock, io.in, io.enable)
   }
 
   val io = IO(new ModIO)
-  val mod = Module(new Inner(io.clock.asClock))
+  val mod = withClock(io.clock.asClock) {
+    Module(new Inner)
+  }
   io <> mod.io
   
   override def desiredName = "NegativeEdgeLatchTestModule" + dataType.getClass().getSimpleName()  // TODO needed to not break verilator 

@@ -3,7 +3,7 @@
 package jtag
 
 import chisel3._
-import chisel3.core.DataMirror
+import chisel3.experimental.DataMirror
 import chisel3.internal.firrtl.KnownWidth
 import chisel3.util._
 
@@ -151,7 +151,7 @@ class CaptureUpdateChain[+T <: Data, +V <: Data](genCapture: T, genUpdate: V) ex
 
   if (updateWidth > 0) {
     val updateBits = Cat(regs.reverse)(updateWidth-1, 0)
-    io.update.bits := io.update.bits.fromBits(updateBits)
+    io.update.bits := updateBits.asTypeOf(io.update.bits)
   } else {
     io.update.bits := 0.U
   }

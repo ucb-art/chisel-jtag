@@ -64,7 +64,7 @@ class DecoupledSinkChain[+T <: Data](gen: T) extends Chain {
 
   class CaptureType extends Bundle {
     val valid = Bool()  // MSbit
-    val bits = gen.chiselCloneType  // LSbits
+    val bits = gen      // LSbits
     override def cloneType: this.type = (new CaptureType).asInstanceOf[this.type]
   }
 

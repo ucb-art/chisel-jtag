@@ -1,13 +1,10 @@
 // See LICENSE for license details.
 
-package jtag.test
+package jtag
 
 import org.scalatest._
 
-import chisel3.iotesters.experimental.ImplicitPokeTester
-
 import chisel3._
-import jtag._
 
 class DecoupledShifterSpec extends FlatSpec with ChainIOUtils {
   import BinaryParse._

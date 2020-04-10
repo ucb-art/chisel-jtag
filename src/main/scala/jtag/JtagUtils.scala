@@ -2,9 +2,6 @@
 
 package jtag
 
-import chisel3._
-import chisel3.util._
-
 object JtagIdcode {
   /** Generates a JTAG IDCODE as a 32-bit integer, using the format in 12.1.1d.
     */

@@ -4,7 +4,6 @@ package jtag
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.withReset
 
 object JtagState {
   sealed abstract class State(val id: Int) {
