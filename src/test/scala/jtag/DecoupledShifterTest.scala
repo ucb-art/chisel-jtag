@@ -3,7 +3,6 @@
 package jtag
 
 import org.scalatest._
-
 import chisel3._
 
 class DecoupledShifterSpec extends FlatSpec with ChainIOUtils {

@@ -30,10 +30,9 @@ trait ChainIO extends Bundle {
   val chainOut = Output(new ShifterIO)
 }
 
-class Capture[+T <: Data](gen: T) extends Bundle {
+class Capture[+T <: Data](private val gen: T) extends Bundle {
   val bits = Input(gen)  // data to capture, should be always valid
   val capture = Output(Bool())  // will be high in capture state (single cycle), captured on following rising edge
-  override def cloneType = Capture(gen).asInstanceOf[this.type]
 }
 
 object Capture {

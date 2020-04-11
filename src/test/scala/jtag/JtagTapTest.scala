@@ -146,7 +146,7 @@ trait JtagModule extends Module {
 class JtagClocked[T <: JtagModule](name: String, gen: ()=>T) extends Module {
   class Reclocked extends Module {
     val mod = Module(gen())
-    val io = IO(mod.io.cloneType)
+    val io = IO(chiselTypeOf(mod.io))
     io <> mod.io
   }
 
@@ -156,7 +156,7 @@ class JtagClocked[T <: JtagModule](name: String, gen: ()=>T) extends Module {
     Module(new Reclocked)
   }
 
-  val io = IO(clockMod.io.cloneType)
+  val io = IO(chiselTypeOf(clockMod.io))
   io <> clockMod.io
   innerClock := io.jtag.TCK
   innerReset := clockMod.io.output.reset

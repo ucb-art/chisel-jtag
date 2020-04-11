@@ -34,7 +34,7 @@ object NegativeEdgeLatch {
     // TODO better init passing once in-module multiclock support improves
 
     val latch_module = withClock((!(modClock.asUInt)).asClock) {
-      Module(new NegativeEdgeLatch(next.cloneType))
+      Module(new NegativeEdgeLatch(chiselTypeOf(next)))
     }
     latch_module.io.next := next
     latch_module.io.enable := enable

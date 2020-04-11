@@ -8,7 +8,6 @@ import chisel3.iotesters.experimental.{ImplicitPokeTester, VerilatorBackend}
 
 import chisel3._
 import chisel3.util._
-import jtag._
 
 class NegativeEdgeLatchTestModule[T <: Data](dataType: T) extends Module {
   class ModIO extends Bundle {
@@ -66,12 +65,12 @@ class NegativeEdgeLatchSpec extends FlatSpec with ImplicitPokeTester {
     test(new NegativeEdgeLatchTestModule(UInt(2.W)), testerBackend=VerilatorBackend) { implicit t => c =>
       poke(c.io.clock, 1)  // reset to high
       poke(c.io.enable, 1)
-    
+
       poke(c.io.in, 0)
       poke(c.io.clock, 0)  // latch on this edge
       step(1)
       check(c.io.out, 0)
-    
+
       poke(c.io.in, 3)
       poke(c.io.clock, 1)  // should NOT latch on this edge
       step(1)
@@ -79,7 +78,7 @@ class NegativeEdgeLatchSpec extends FlatSpec with ImplicitPokeTester {
       poke(c.io.clock, 0)  // latch on this edge
       step(1)
       check(c.io.out, 3)
-    
+
       poke(c.io.in, 2)
       poke(c.io.clock, 1)  // should NOT latch on this edge
       step(1)
@@ -87,10 +86,10 @@ class NegativeEdgeLatchSpec extends FlatSpec with ImplicitPokeTester {
       poke(c.io.clock, 0)  // latch on this edge
       step(1)
       check(c.io.out, 2)
-    
+
       poke(c.io.enable, 0)  // check disable
       poke(c.io.in, 1)
-    
+
       poke(c.io.clock, 1)
       step(1)
       check(c.io.out, 2)
@@ -108,8 +107,8 @@ class ClockedCounterTestModule(counts: Int) extends Module {
   }
   val io = IO(new ModIO)
   io.out := ClockedCounter(io.in, counts, 0)
-  
-  override def desiredName = "ClockedCounterTestModule" + counts  // TODO needed to not break verilator 
+
+  override def desiredName = "ClockedCounterTestModule" + counts  // TODO needed to not break verilator
 }
 
 class ClockedCounterSpec extends FlatSpec with ImplicitPokeTester {
@@ -119,23 +118,23 @@ class ClockedCounterSpec extends FlatSpec with ImplicitPokeTester {
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 0)
-    
+
       // Simple transition
       poke(c.io.in, true)
       step(1)
       check(c.io.out, 1)
-    
+
       // Main clock runs without counter transitioning
       step(1)
       check(c.io.out, 1)
       step(1)
       check(c.io.out, 1)
-    
+
       // No counting on falling edge
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 1)
-    
+
       // More transitions and overflow test
       poke(c.io.in, true)
       step(1)
@@ -143,20 +142,20 @@ class ClockedCounterSpec extends FlatSpec with ImplicitPokeTester {
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 2)
-    
+
       poke(c.io.in, true)
       step(1)
       check(c.io.out, 3)
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 3)
-    
+
       poke(c.io.in, true)
       step(1)
       check(c.io.out, 0)
       poke(c.io.in, false)
       step(1)
-      check(c.io.out, 0)  
+      check(c.io.out, 0)
     }
   }
   "ClockedCounter with 3 counts" should "work" in {
@@ -165,23 +164,23 @@ class ClockedCounterSpec extends FlatSpec with ImplicitPokeTester {
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 0)
-    
+
       // Simple transition
       poke(c.io.in, true)
       step(1)
       check(c.io.out, 1)
-    
+
       // Main clock runs without counter transitioning
       step(1)
       check(c.io.out, 1)
       step(1)
       check(c.io.out, 1)
-    
+
       // No counting on falling edge
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 1)
-    
+
       // More transitions and overflow test
       poke(c.io.in, true)
       step(1)
@@ -189,7 +188,7 @@ class ClockedCounterSpec extends FlatSpec with ImplicitPokeTester {
       poke(c.io.in, false)
       step(1)
       check(c.io.out, 2)
-    
+
       poke(c.io.in, true)
       step(1)
       check(c.io.out, 0)
