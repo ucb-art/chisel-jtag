@@ -1,4 +1,4 @@
-import scala.language.implicitConversions
+package jtag
 
 package object jtag {
   /** An implicit conversion to allow the instruction map for the TAP generator to be specified as

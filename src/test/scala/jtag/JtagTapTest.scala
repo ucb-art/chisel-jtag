@@ -1,6 +1,6 @@
 // See LICENSE for license details.
 
-package jtag.test
+package jtag
 
 import org.scalatest._
 
@@ -144,18 +144,19 @@ trait JtagModule extends Module {
 }
 
 class JtagClocked[T <: JtagModule](name: String, gen: ()=>T) extends Module {
-  class Reclocked(modClock: Clock, modReset: Bool)
-      extends Module(override_clock=Some(modClock), override_reset=Some(modReset)) {
+  class Reclocked extends Module {
     val mod = Module(gen())
-    val io = IO(mod.io.cloneType)
+    val io = IO(chiselTypeOf(mod.io))
     io <> mod.io
   }
 
   val innerClock = Wire(Bool())
   val innerReset = Wire(Bool())
-  val clockMod = Module(new Reclocked(innerClock.asClock, innerReset))
+  val clockMod = withClockAndReset(innerClock.asClock, innerReset) {
+    Module(new Reclocked)
+  }
 
-  val io = IO(clockMod.io.cloneType)
+  val io = IO(chiselTypeOf(clockMod.io))
   io <> clockMod.io
   innerClock := io.jtag.TCK
   innerReset := clockMod.io.output.reset

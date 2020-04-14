@@ -3,7 +3,6 @@
 package jtag
 
 import chisel3._
-import chisel3.util._
 
 /** JTAG signals, viewed from the device side.
   */
@@ -31,12 +30,10 @@ class JtagControl extends Bundle {
 
 /** Aggregate JTAG block IO.
   */
-class JtagBlockIO(irLength: Int) extends Bundle {
+class JtagBlockIO(val irLength: Int) extends Bundle {
   val jtag = new JtagIO
   val control = new JtagControl
   val output = new JtagOutput(irLength)
-
-  override def cloneType = new JtagBlockIO(irLength).asInstanceOf[this.type]
 }
 
 /** Internal controller block IO with data shift outputs.
@@ -44,8 +41,6 @@ class JtagBlockIO(irLength: Int) extends Bundle {
 class JtagControllerIO(irLength: Int) extends JtagBlockIO(irLength) {
   val dataChainOut = Output(new ShifterIO)
   val dataChainIn = Input(new ShifterIO)
-
-  override def cloneType = new JtagControllerIO(irLength).asInstanceOf[this.type]
 }
 
 /** JTAG TAP controller internal block, responsible for instruction decode and data register chain
@@ -60,9 +55,12 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   val io = IO(new JtagControllerIO(irLength))
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
+  tdo := DontCare  //TODO: figure out what isn't getting connected
   val tdo_driven = Wire(Bool())
+  tdo_driven := DontCare  //TODO: figure out what isn't getting connected
   io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo)  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
   io.jtag.TDO.driven := NegativeEdgeLatch(clock, tdo_driven)
+
 
   //
   // JTAG state machine
@@ -87,11 +85,14 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   irShifter.io.capture.bits := "b01".U
 
   val updateInstruction = Wire(Bool())
+  updateInstruction := DontCare  //TODO: figure out what isn't getting connected
 
   val nextActiveInstruction = Wire(UInt(irLength.W))
+  nextActiveInstruction := DontCare  //TODO: figure out what isn't getting connected
+
   val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
 
-  when (reset) {
+  when (reset.asBool) {
     nextActiveInstruction := initialInstruction.U(irLength.W)
     updateInstruction := true.B
   } .elsewhen (currState === JtagState.UpdateIR.U) {
@@ -207,6 +208,7 @@ object JtagTapGenerator {
       }
     }
 
+    controllerInternal.io.dataChainIn := DontCare  //TODO: figure out what isn't getting connected
     val emptyWhen = when (false.B) { }  // Empty WhenContext to start things off
     chainToSelect.toSeq.foldLeft(emptyWhen)(foldOutSelect).otherwise {
       controllerInternal.io.dataChainIn := bypassChain.io.chainOut
@@ -224,6 +226,7 @@ object JtagTapGenerator {
     chainToSelect.map(mapInSelect)
 
     val internalIo = Wire(new JtagBlockIO(irLength))
+    internalIo := DontCare  //TODO: figure out what isn't getting connected
 
     controllerInternal.io.jtag <> internalIo.jtag
     controllerInternal.io.control <> internalIo.control

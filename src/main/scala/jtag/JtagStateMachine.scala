@@ -4,7 +4,6 @@ package jtag
 
 import chisel3._
 import chisel3.util._
-import chisel3.experimental.withReset
 
 object JtagState {
   sealed abstract class State(val id: Int) {
@@ -65,7 +64,7 @@ object JtagState {
   * - 6.1.1.1b state transitions occur on TCK rising edge
   * - 6.1.1.1c actions can occur on the following TCK falling or rising edge
   */
-class JtagStateMachine extends Module() {
+class JtagStateMachine extends Module {
   class StateMachineIO extends Bundle {
     val tms = Input(Bool())
     val currState = Output(JtagState.State.chiselType())
@@ -81,6 +80,7 @@ class JtagStateMachine extends Module() {
   
   withReset (io.asyncReset) {
     val nextState = Wire(JtagState.State.chiselType())
+    nextState := DontCare  //TODO: figure out what isn't getting connected
     val lastState = RegNext(nextState, JtagState.TestLogicReset.U)
     
     switch (lastState) {
