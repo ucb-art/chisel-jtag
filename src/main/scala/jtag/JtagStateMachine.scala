@@ -80,7 +80,7 @@ class JtagStateMachine extends Module {
   
   withReset (io.asyncReset) {
     val nextState = Wire(JtagState.State.chiselType())
-    nextState := DontCare
+    nextState := DontCare  //TODO: figure out what isn't getting connected
     val lastState = RegNext(nextState, JtagState.TestLogicReset.U)
     
     switch (lastState) {

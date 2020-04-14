@@ -55,9 +55,9 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   val io = IO(new JtagControllerIO(irLength))
 
   val tdo = Wire(Bool())  // 4.4.1c TDI should appear here uninverted after shifting
-  tdo := DontCare
+  tdo := DontCare  //TODO: figure out what isn't getting connected
   val tdo_driven = Wire(Bool())
-  tdo_driven := DontCare
+  tdo_driven := DontCare  //TODO: figure out what isn't getting connected
   io.jtag.TDO.data := NegativeEdgeLatch(clock, tdo)  // 4.5.1a TDO changes on falling edge of TCK or TRST, 6.1.2.1d driver active on first TCK falling edge in ShiftIR and ShiftDR states
   io.jtag.TDO.driven := NegativeEdgeLatch(clock, tdo_driven)
 
@@ -85,10 +85,10 @@ class JtagTapController(irLength: Int, initialInstruction: BigInt) extends Modul
   irShifter.io.capture.bits := "b01".U
 
   val updateInstruction = Wire(Bool())
-  updateInstruction := DontCare
+  updateInstruction := DontCare  //TODO: figure out what isn't getting connected
 
   val nextActiveInstruction = Wire(UInt(irLength.W))
-  nextActiveInstruction := DontCare
+  nextActiveInstruction := DontCare  //TODO: figure out what isn't getting connected
 
   val activeInstruction = NegativeEdgeLatch(clock, nextActiveInstruction, updateInstruction)   // 7.2.1d active instruction output latches on TCK falling edge
 
@@ -208,7 +208,7 @@ object JtagTapGenerator {
       }
     }
 
-    controllerInternal.io.dataChainIn := DontCare
+    controllerInternal.io.dataChainIn := DontCare  //TODO: figure out what isn't getting connected
     val emptyWhen = when (false.B) { }  // Empty WhenContext to start things off
     chainToSelect.toSeq.foldLeft(emptyWhen)(foldOutSelect).otherwise {
       controllerInternal.io.dataChainIn := bypassChain.io.chainOut
@@ -226,7 +226,7 @@ object JtagTapGenerator {
     chainToSelect.map(mapInSelect)
 
     val internalIo = Wire(new JtagBlockIO(irLength))
-    internalIo := DontCare
+    internalIo := DontCare  //TODO: figure out what isn't getting connected
 
     controllerInternal.io.jtag <> internalIo.jtag
     controllerInternal.io.control <> internalIo.control
