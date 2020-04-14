@@ -254,8 +254,6 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
     class InnerBundle extends Bundle {
       val d = Bool()
       val c = UInt(2.W)
-
-//      override def cloneType: this.type = (new InnerBundle).asInstanceOf[this.type]
     }
 
     class TestBundle extends Bundle {
@@ -263,9 +261,6 @@ class JtagShifterSpec extends FlatSpec with ChainIOUtils {
       val a = Bool()  // this is second to ensure Bundle order is preserved
       val c = Vec(3, Bool())
       val x = new InnerBundle()
-
-//      override def cloneType: this.type = (new TestBundle).asInstanceOf[this.type]
-
       // Ordering should be:
       // b[1:0] a c[2] c[1] c[0] x.d x.c[1:0]
     }
